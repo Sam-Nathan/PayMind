@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useRealtimeSync } from '../data/useRealtimeSync.ts';
+import { CaptureSync } from '../features/capture/useCapture.ts';
 import { AuthProvider } from './AuthProvider.tsx';
 
 /** Mounts the single Supabase Realtime channel for the signed-in user. */
@@ -21,6 +22,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <RealtimeSync />
+            <CaptureSync />
             {children}
           </AuthProvider>
         </QueryClientProvider>

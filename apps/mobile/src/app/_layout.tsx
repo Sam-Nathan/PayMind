@@ -64,7 +64,9 @@ function Routes() {
         <Stack.Screen name="recurring" options={{ title: 'Recurring' }} />
         <Stack.Screen name="goals" options={{ title: 'Goals' }} />
         <Stack.Screen name="timeline" options={{ title: 'Timeline' }} />
-        <Stack.Screen name="privacy" options={{ title: 'Privacy' }} />
+        <Stack.Screen name="privacy" options={{ title: 'Privacy & data' }} />
+        <Stack.Screen name="capture-inbox" options={{ title: 'Picked up automatically' }} />
+        <Stack.Screen name="capture-permission" options={{ title: 'Auto-capture', presentation: 'modal' }} />
       </Stack.Protected>
     </Stack>
   );

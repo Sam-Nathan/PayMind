@@ -7,14 +7,17 @@ import { supabase } from '../../lib/supabase.ts';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import type { BillMethod } from './logic.ts';
 
+// Keys that mirror shared data start with the shared prefix ('budgets', 'goals', 'recurring',
+// 'expenses') so the existing invalidations (create budget/goal/contribution, create expense,
+// Realtime) refresh the space screens too.
 export const spaceKeys = {
   defaultSplit: (id: string | undefined) => ['space-extra', 'default-split', id] as const,
   rules: (id: string | undefined) => ['space-extra', 'rules', id] as const,
-  budgets: (id: string | undefined) => ['space-extra', 'budgets', id] as const,
-  goal: (id: string | undefined) => ['space-extra', 'goal', id] as const,
-  recurring: (id: string | undefined) => ['space-extra', 'recurring', id] as const,
+  budgets: (id: string | undefined) => ['budgets', 'space', id] as const,
+  goal: (id: string | undefined) => ['goals', 'space', id] as const,
+  recurring: (id: string | undefined) => ['recurring', 'space', id] as const,
   myShare: (id: string | undefined, member: string | undefined, month: string) =>
-    ['space-extra', 'my-share', id, member, month] as const,
+    ['expenses', 'my-space-share', id, member, month] as const,
   invitePreview: (code: string | undefined) => ['space-extra', 'invite', code] as const,
 };
 

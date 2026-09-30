@@ -104,3 +104,8 @@ select
   coalesce(t.paid - t.owed + t.sent - t.received, 0)::bigint as net_minor
 from public.space_members m
 left join totals t on t.space_id = m.space_id and t.member_id = m.id;
+
+-- space_invites (added in 06) gets the same index-friendly membership form.
+drop policy if exists space_invites_select on public.space_invites;
+create policy space_invites_select on public.space_invites for select to authenticated
+  using (space_id = any (array(select private.my_space_ids())));

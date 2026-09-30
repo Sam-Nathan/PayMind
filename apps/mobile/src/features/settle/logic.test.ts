@@ -209,10 +209,12 @@ describe('verify transitions follow core nextStatuses', () => {
     expect(answerState('pending', 'pending').allowed).toBe(true);
   });
   it('blocks moves the state machine does not allow', () => {
-    expect(answerState('failed', 'completed').allowed).toBe(false);
     expect(answerState('failed', 'pending').allowed).toBe(false);
     expect(answerState('completed', 'pending').allowed).toBe(false);
     expect(answerState('cancelled', 'completed').allowed).toBe(false);
+  });
+  it('lets a failed payment be marked as gone through after all (UPI reversal)', () => {
+    expect(answerState('failed', 'completed').allowed).toBe(true);
   });
   it('maps a UPI app result to a status', () => {
     expect(statusFromUpiResult('success')).toBe('completed');

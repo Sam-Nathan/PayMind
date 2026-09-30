@@ -14,10 +14,10 @@ import {
 const expected: Record<SettlementStatus, SettlementStatus[]> = {
   initiated: ['pending', 'completed', 'failed', 'cancelled', 'confirmed_manual'],
   pending: ['completed', 'failed', 'cancelled', 'confirmed_manual'],
-  failed: ['initiated', 'cancelled'],
+  failed: ['initiated', 'completed', 'confirmed_manual', 'cancelled'],
   completed: ['corrected', 'cancelled'],
   confirmed_manual: ['corrected', 'cancelled'],
-  corrected: [],
+  corrected: ['cancelled'],
   cancelled: [],
 };
 
@@ -33,7 +33,7 @@ describe('settlement state machine', () => {
 
   it('no self transitions; terminal states', () => {
     for (const s of SETTLEMENT_STATUSES) expect(canTransition(s, s)).toBe(false);
-    expect(isTerminalStatus('corrected')).toBe(true);
+    expect(isTerminalStatus('corrected')).toBe(false);
     expect(isTerminalStatus('cancelled')).toBe(true);
     expect(isTerminalStatus('pending')).toBe(false);
   });
@@ -45,6 +45,13 @@ describe('settlement state machine', () => {
     expect(s).toBe('completed');
     expect(() => transition('cancelled', 'completed')).toThrow(InvalidTransitionError);
     expect(() => transition('pending', 'initiated')).toThrow(/pending to initiated/);
+  });
+
+  it('matches the DB trigger: a UPI "failure" can still complete later', () => {
+    expect(transition('failed', 'completed')).toBe('completed');
+    expect(canTransition('failed', 'confirmed_manual')).toBe(true);
+    expect(canTransition('corrected', 'cancelled')).toBe(true);
+    expect(canTransition('corrected', 'completed')).toBe(false);
   });
 
   it('guards', () => {

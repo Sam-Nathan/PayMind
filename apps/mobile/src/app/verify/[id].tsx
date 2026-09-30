@@ -170,7 +170,8 @@ export default function VerifyScreen() {
               <>
                 <Text className="font-sans-bold mt-3 text-[27px] leading-[32px] text-ink">That payment didn&apos;t go through.</Text>
                 <Text className="font-sans mt-2 text-[15px] leading-[21px] text-muted">
-                  Nothing was recorded against your balance. You can try again or cancel it.
+                  Nothing was recorded against your balance. If the money did leave your account, mark it as
+                  paid; otherwise try again or cancel it.
                 </Text>
               </>
             ) : (
@@ -236,6 +237,23 @@ export default function VerifyScreen() {
             </>
           ) : status === 'failed' ? (
             <>
+              {/* UPI apps often report a failure for a payment that completes minutes later;
+                  the DB (and core) allow failed -> completed for exactly this case. */}
+              <Button
+                label="It went through after all"
+                variant="dark"
+                size="lg"
+                loading={update.isPending}
+                disabled={!answerState(s.status, 'completed').allowed}
+                onPress={() => answer('completed')}
+              />
+              <TextField
+                label="Optional: UPI reference (UTR) from your app"
+                value={utr}
+                onChangeText={setUtr}
+                placeholder="12-digit reference"
+                autoCapitalize="characters"
+              />
               <Button
                 label="Try again"
                 size="lg"

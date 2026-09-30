@@ -2,7 +2,9 @@
  * Settlement status state machine (design pages 9 & 21). PayMind never moves money;
  * it only tracks what the user tells us happened in their UPI app.
  *
- * Keep in sync with the SQL implementation (Architect) — exactly these transitions.
+ * The database trigger `private.settlement_transition_allowed` (migration 03) is the source of
+ * truth; this table mirrors it exactly. Note `failed -> completed`: UPI apps often report a
+ * "failure" for a payment that later goes through, so the payer can still mark it completed.
  */
 
 export const SETTLEMENT_STATUSES = [
@@ -20,10 +22,11 @@ export type SettlementStatus = (typeof SETTLEMENT_STATUSES)[number];
 export const SETTLEMENT_TRANSITIONS: Readonly<Record<SettlementStatus, readonly SettlementStatus[]>> = {
   initiated: ['pending', 'completed', 'failed', 'cancelled', 'confirmed_manual'],
   pending: ['completed', 'failed', 'cancelled', 'confirmed_manual'],
-  failed: ['initiated', 'cancelled'],
+  failed: ['initiated', 'completed', 'confirmed_manual', 'cancelled'],
   completed: ['corrected', 'cancelled'],
   confirmed_manual: ['corrected', 'cancelled'],
-  corrected: [],
+  // A further correction keeps status 'corrected' (same-status update with a new amount).
+  corrected: ['cancelled'],
   cancelled: [],
 };
 

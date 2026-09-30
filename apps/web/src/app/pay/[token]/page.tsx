@@ -1,4 +1,4 @@
-import { groupIndian } from '@paymind/core';
+import { floorToRupees, groupIndian } from '@paymind/core';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { QrCode } from '../../../components/QrCode';
@@ -48,7 +48,7 @@ export default async function PayPage({ params }: Props) {
     );
   }
 
-  const rupees = groupIndian(String(Math.floor(link.amount_minor / 100)));
+  const rupees = groupIndian(String(floorToRupees(link.amount_minor)));
   const paise = link.amount_minor % 100;
 
   return (

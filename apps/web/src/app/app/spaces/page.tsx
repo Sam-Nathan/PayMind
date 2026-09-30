@@ -19,23 +19,19 @@ export default async function SpacesPage() {
   let balances: BalanceRow[] = [];
   let loadError = false;
   try {
-    const s = await supabase
-      .from('spaces')
-      .select('id,type,name,starts_on,ends_on,budget_minor,currency,status,created_by,created_at')
-      .order('created_at', { ascending: false });
-    if (s.error) loadError = true;
-    spaces = (s.data as Space[] | null) ?? [];
-    if (spaces.length) {
-      const b = await supabase
+    // Parallel: RLS already limits balances to the viewer's spaces.
+    const [s, b] = await Promise.all([
+      supabase
+        .from('spaces')
+        .select('id,type,name,starts_on,ends_on,budget_minor,currency,status,created_by,created_at')
+        .order('created_at', { ascending: false }),
+      supabase
         .from('balances')
-        .select('*')
-        .in(
-          'space_id',
-          spaces.map((x) => x.id),
-        );
-      if (b.error) loadError = true;
-      balances = (b.data as BalanceRow[] | null) ?? [];
-    }
+        .select('space_id,member_id,user_id,display_name,left_at,paid_minor,owed_minor,settled_out_minor,settled_in_minor,net_minor'),
+    ]);
+    if (s.error || b.error) loadError = true;
+    spaces = (s.data as Space[] | null) ?? [];
+    balances = (b.data as BalanceRow[] | null) ?? [];
   } catch {
     loadError = true;
   }

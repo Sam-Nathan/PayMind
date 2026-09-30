@@ -29,21 +29,22 @@ export default async function SpaceDetailPage({ params }: { params: Promise<{ id
   const user = await requireUser();
   const supabase = await createClient();
 
-  const spaceRes = await supabase
-    .from('spaces')
-    .select('id,type,name,starts_on,ends_on,budget_minor,currency,status,created_by,created_at')
-    .eq('id', id)
-    .maybeSingle();
-  const space = spaceRes.data as Space | null;
-  if (!space) notFound();
-
-  const [membersRes, balancesRes, expensesRes, settlementsRes, catRes] = await Promise.all([
+  // All six reads in one round trip; RLS returns nothing for a space the viewer can't see.
+  const [spaceRes, membersRes, balancesRes, expensesRes, settlementsRes, catRes] = await Promise.all([
+    supabase
+      .from('spaces')
+      .select('id,type,name,starts_on,ends_on,budget_minor,currency,status,created_by,created_at')
+      .eq('id', id)
+      .maybeSingle(),
     supabase
       .from('space_members')
       .select('id,space_id,user_id,display_name,upi_vpa,role,share_weight,left_at')
       .eq('space_id', id)
       .order('joined_at', { ascending: true }),
-    supabase.from('balances').select('*').eq('space_id', id),
+    supabase
+      .from('balances')
+      .select('space_id,member_id,user_id,display_name,left_at,paid_minor,owed_minor,settled_out_minor,settled_in_minor,net_minor')
+      .eq('space_id', id),
     supabase
       .from('expenses')
       .select('id,owner_id,space_id,title,total_minor,paid_by_member,occurred_at,status,category_id')
@@ -59,6 +60,8 @@ export default async function SpaceDetailPage({ params }: { params: Promise<{ id
       .order('created_at', { ascending: false }),
     supabase.from('categories').select('id,slug,name').is('owner_id', null).order('sort_order'),
   ]);
+  const space = spaceRes.data as Space | null;
+  if (!space) notFound();
 
   const members = (membersRes.data as SpaceMember[] | null) ?? [];
   const balances = (balancesRes.data as BalanceRow[] | null) ?? [];

@@ -1,4 +1,4 @@
-import { formatINR } from '@paymind/core';
+import { formatINR, friendlyError } from '@paymind/core';
 
 /** ₹1,166 (whole rupees, for summaries). */
 export const inr0 = (paise: number) => formatINR(paise, { decimals: 0 });
@@ -87,19 +87,10 @@ export function errMsg(e: unknown): string {
   return m ?? 'Something went wrong';
 }
 
-/** Turn a Postgres error like "shares_sum_mismatch: ..." into friendly text. */
+/**
+ * Turn a Postgres error like "shares_sum_mismatch: ..." into friendly text. The code -> copy
+ * mapping is shared with the mobile app via @paymind/core.
+ */
 export function friendlyDbError(message: string): string {
-  const code = message.split(':')[0]?.trim() ?? '';
-  const map: Record<string, string> = {
-    not_authenticated: 'Please sign in again.',
-    not_space_member: 'You are not a member of this space.',
-    not_a_settlement_party: 'Only the people involved (or a space owner) can record this.',
-    shares_sum_mismatch: "The split doesn't add up to the total.",
-    invalid_total: 'Enter an amount greater than zero.',
-    invalid_amount: 'Enter a valid amount.',
-    payer_not_in_space: 'The payer must be a member of this space.',
-    illegal_settlement_transition: 'That payment cannot move to that state.',
-    member_display_name_required: 'Every member needs a name.',
-  };
-  return map[code] ?? message;
+  return friendlyError({ message });
 }

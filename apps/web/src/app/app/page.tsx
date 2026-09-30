@@ -25,23 +25,18 @@ export default async function HomePage() {
   let expenses: Expense[] = [];
 
   try {
-    const [p, s] = await Promise.all([
+    // One round trip: RLS already limits balances to the viewer's spaces, so it doesn't need
+    // the space ids first; archived spaces are dropped below.
+    const [p, s, b, e] = await Promise.all([
       supabase.from('profiles').select('id,name,upi_vpa').eq('id', user.id).maybeSingle(),
       supabase
         .from('spaces')
         .select('id,type,name,starts_on,ends_on,budget_minor,currency,status,created_by,created_at')
         .neq('status', 'archived')
         .order('created_at', { ascending: false }),
-    ]);
-    if (p.error || s.error) loadError = true;
-    profile = (p.data as Profile | null) ?? null;
-    spaces = (s.data as Space[] | null) ?? [];
-
-    const ids = spaces.map((x) => x.id);
-    const [b, e] = await Promise.all([
-      ids.length
-        ? supabase.from('balances').select('*').in('space_id', ids)
-        : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from('balances')
+        .select('space_id,member_id,user_id,display_name,left_at,paid_minor,owed_minor,settled_out_minor,settled_in_minor,net_minor'),
       supabase
         .from('expenses')
         .select('id,owner_id,space_id,title,total_minor,paid_by_member,occurred_at,status,category_id')
@@ -49,8 +44,11 @@ export default async function HomePage() {
         .order('occurred_at', { ascending: false })
         .limit(6),
     ]);
-    if (b.error || e.error) loadError = true;
-    balances = (b.data as BalanceRow[] | null) ?? [];
+    if (p.error || s.error || b.error || e.error) loadError = true;
+    profile = (p.data as Profile | null) ?? null;
+    spaces = (s.data as Space[] | null) ?? [];
+    const visible = new Set(spaces.map((x) => x.id));
+    balances = ((b.data as BalanceRow[] | null) ?? []).filter((r) => visible.has(r.space_id));
     expenses = (e.data as Expense[] | null) ?? [];
   } catch {
     loadError = true;

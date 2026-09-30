@@ -1,14 +1,13 @@
-import { simplifyDebts, type Transfer } from '@paymind/core';
+import {
+  spaceTransfers,
+  summariseStanding,
+  type MemberBalance,
+  type SpaceStanding,
+  type Transfer,
+} from '@paymind/core';
 import type { BalanceRow } from './types';
 
-export interface SpaceStanding {
-  spaceId: string;
-  /** My net in this space: > 0 I am owed, < 0 I owe. */
-  netMinor: number;
-  myMemberId: string | null;
-  /** Simplified transfers in this space (who pays whom). */
-  transfers: Transfer[];
-}
+export type { SpaceStanding };
 
 export interface DebtSummary {
   owedToMeMinor: number;
@@ -17,76 +16,37 @@ export interface DebtSummary {
   debtorCount: number;
   /** Spaces in which I am owed something. */
   creditSpaceCount: number;
-  /** Largest amount I owe to one person: { name, spaceId }. */
+  /** The person I owe most (across spaces): { name, spaceId, amountMinor }. */
   largestCreditor: { name: string; spaceId: string; amountMinor: number } | null;
   bySpace: Map<string, SpaceStanding>;
 }
 
+const toMemberBalance = (r: BalanceRow): MemberBalance => ({
+  spaceId: r.space_id,
+  memberId: r.member_id,
+  userId: r.user_id,
+  displayName: r.display_name,
+  netMinor: Number(r.net_minor),
+});
+
 /**
- * Turn `balances` rows (across the viewer's spaces) into my standing per space, using core's
- * simplifyDebts so the maths is identical to the Settle-up screens.
+ * Turn `balances` rows (across the viewer's spaces) into my standing, using core's
+ * summariseStanding: the same maths as the mobile Home screen.
  */
 export function summariseDebts(rows: BalanceRow[], userId: string): DebtSummary {
-  const bySpaceRows = new Map<string, BalanceRow[]>();
-  for (const r of rows) {
-    const list = bySpaceRows.get(r.space_id) ?? [];
-    list.push(r);
-    bySpaceRows.set(r.space_id, list);
-  }
-
-  const summary: DebtSummary = {
-    owedToMeMinor: 0,
-    iOweMinor: 0,
-    debtorCount: 0,
-    creditSpaceCount: 0,
-    largestCreditor: null,
-    bySpace: new Map(),
+  const s = summariseStanding(rows.map(toMemberBalance), userId);
+  const top = s.owes[0];
+  return {
+    owedToMeMinor: s.owedToYouMinor,
+    iOweMinor: s.youOweMinor,
+    debtorCount: s.owedBy.length,
+    creditSpaceCount: s.spacesOwedCount,
+    largestCreditor: top ? { name: top.name, spaceId: top.spaceIds[0] ?? '', amountMinor: top.amountMinor } : null,
+    bySpace: s.bySpace,
   };
-  const debtors = new Set<string>();
-
-  for (const [spaceId, list] of bySpaceRows) {
-    const me = list.find((r) => r.user_id === userId) ?? null;
-    const transfers = transfersFor(list);
-    const standing: SpaceStanding = {
-      spaceId,
-      netMinor: me ? Number(me.net_minor) : 0,
-      myMemberId: me?.member_id ?? null,
-      transfers,
-    };
-    summary.bySpace.set(spaceId, standing);
-    if (!me) continue;
-
-    let creditInSpace = false;
-    for (const t of transfers) {
-      if (t.to === me.member_id) {
-        summary.owedToMeMinor += t.amountMinor;
-        debtors.add(t.from);
-        creditInSpace = true;
-      } else if (t.from === me.member_id) {
-        summary.iOweMinor += t.amountMinor;
-        if (!summary.largestCreditor || t.amountMinor > summary.largestCreditor.amountMinor) {
-          const creditor = list.find((r) => r.member_id === t.to);
-          summary.largestCreditor = {
-            name: creditor?.display_name ?? 'Someone',
-            spaceId,
-            amountMinor: t.amountMinor,
-          };
-        }
-      }
-    }
-    if (creditInSpace) summary.creditSpaceCount += 1;
-  }
-  summary.debtorCount = debtors.size;
-  return summary;
 }
 
 /** Simplified transfers for one space's balance rows (empty if the nets don't sum to zero). */
 export function transfersFor(rows: BalanceRow[]): Transfer[] {
-  const nets: Record<string, number> = {};
-  for (const r of rows) nets[r.member_id] = Number(r.net_minor);
-  try {
-    return simplifyDebts(nets);
-  } catch {
-    return [];
-  }
+  return spaceTransfers(rows.map(toMemberBalance));
 }

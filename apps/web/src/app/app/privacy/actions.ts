@@ -1,5 +1,6 @@
 'use server';
 
+import type { TablesUpdate } from '@paymind/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireUser } from '../../../lib/auth';
@@ -23,7 +24,8 @@ const KEYS = [
 export async function savePrivacyAction(_prev: PrivacyState, formData: FormData): Promise<PrivacyState> {
   const user = await requireUser();
   // Unchecked checkboxes are absent from FormData, so absence means "off".
-  const patch = Object.fromEntries(KEYS.map((k) => [k, formData.get(k) !== null]));
+  const patch: TablesUpdate<'privacy_settings'> = {};
+  for (const k of KEYS) patch[k] = formData.get(k) !== null;
   try {
     const supabase = await createClient();
     const { error } = await supabase.from('privacy_settings').update(patch).eq('user_id', user.id);

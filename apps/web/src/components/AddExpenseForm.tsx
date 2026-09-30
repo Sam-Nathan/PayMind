@@ -1,5 +1,6 @@
 'use client';
 
+import type { Json } from '@paymind/db';
 import {
   rupeesToPaise,
   splitEqual,
@@ -139,7 +140,7 @@ export function AddExpenseForm({
     setBusy(true);
     try {
       const supabase = createClient();
-      const { error: rpcError } = await supabase.rpc('create_expense', { p: payload });
+      const { error: rpcError } = await supabase.rpc('create_expense', { p: payload as Json }) // payload is built and validated above; jsonb arg;
       if (rpcError) throw new Error(rpcError.message);
       setTitle('');
       setAmount('');

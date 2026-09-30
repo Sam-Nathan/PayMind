@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Json } from '@paymind/db';
 import { useAuth } from '../providers/AuthProvider.tsx';
 import { supabase } from '../lib/supabase.ts';
 import { monthStartDateTime, monthStartIso } from './dates.ts';
@@ -54,7 +55,7 @@ export function useCreateExpense() {
   return useMutation({
     mutationFn: async (draft: ExpenseDraft): Promise<string> => {
       const payload = buildCreateExpensePayload(draft);
-      const { data, error } = await supabase.rpc('create_expense', { p: payload });
+      const { data, error } = await supabase.rpc('create_expense', { p: payload as unknown as Json }) // validated by buildCreateExpensePayload; jsonb arg;
       if (error) throw error;
       return data as string;
     },
@@ -80,6 +81,7 @@ export function useMonthSpend(now: Date = new Date()) {
     queryKey: qk.monthSpend(uid, from),
     enabled: !!uid,
     queryFn: async (): Promise<number> => {
+      if (!uid) throw new Error('Not signed in.');
       const since = monthStartDateTime(now);
       // Two narrow reads in parallel: my personal totals, and only MY shares of shared expenses
       // (filtered server-side through the member row), instead of every member's shares.
@@ -116,6 +118,7 @@ export function useMonthlyBudget() {
     queryKey: qk.budget(uid),
     enabled: !!uid,
     queryFn: async (): Promise<number | null> => {
+      if (!uid) throw new Error('Not signed in.');
       const { data, error } = await supabase
         .from('budgets')
         .select('limit_minor')

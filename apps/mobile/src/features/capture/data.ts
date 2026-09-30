@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { supabase } from '../../lib/supabase.ts';
 import { qk } from '../../data/keys.ts';
+import type { TablesUpdate } from '@paymind/db';
 
 // ---------------------------------------------------------------------------
 // Types (packages/db types are still a placeholder, so these mirror docs/schema.md)
@@ -264,7 +265,7 @@ export function useConfirmCaptured() {
   return useMutation({
     mutationFn: async ({ id, categoryId, edits }: ConfirmArgs): Promise<string> => {
       if (edits && (edits.payee !== undefined || edits.amountMinor !== undefined)) {
-        const patch: Record<string, unknown> = {};
+        const patch: TablesUpdate<'captured_txns'> = {};
         if (edits.payee !== undefined) patch['payee'] = edits.payee;
         if (edits.amountMinor !== undefined) patch['amount_minor'] = edits.amountMinor;
         const { error: updateError } = await supabase.from('captured_txns').update(patch).eq('id', id);

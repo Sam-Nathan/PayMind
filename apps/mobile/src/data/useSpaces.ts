@@ -34,6 +34,7 @@ export function useSpace(id: string | undefined) {
     queryKey: qk.space(id),
     enabled: !!id,
     queryFn: async (): Promise<Space | null> => {
+      if (!id) throw new Error('Missing space id.');
       const { data, error } = await supabase.from('spaces').select(SPACE_COLUMNS).eq('id', id).maybeSingle();
       if (error) throw error;
       return data ? mapSpace(data as SpaceRow) : null;
@@ -47,6 +48,7 @@ export function useSpaceMembers(spaceId: string | undefined) {
     queryKey: qk.spaceMembers(spaceId),
     enabled: !!spaceId,
     queryFn: async (): Promise<SpaceMember[]> => {
+      if (!spaceId) throw new Error('Missing space id.');
       const { data, error } = await supabase
         .from('space_members')
         .select(MEMBER_COLUMNS)

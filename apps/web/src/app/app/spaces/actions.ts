@@ -1,5 +1,6 @@
 'use server';
 
+import type { Enums } from '@paymind/db';
 import { isValidVpa, rupeesToPaise } from '@paymind/core';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -11,7 +12,7 @@ export interface CreateSpaceState {
   error?: string;
 }
 
-const TYPES = [
+const TYPES: Enums<'space_type'>[] = [
   'trip',
   'event',
   'couple',
@@ -36,7 +37,8 @@ export async function createSpaceAction(
   const budgetRaw = String(formData.get('budget') ?? '').trim();
 
   if (!name) return { error: 'Give your space a name.' };
-  if (!TYPES.includes(type)) return { error: 'Pick a space type.' };
+  const spaceType = TYPES.find((t) => t === type);
+  if (!spaceType) return { error: 'Pick a space type.' };
   if (startsOn && endsOn && endsOn < startsOn) return { error: 'The end date is before the start.' };
 
   let budgetMinor: number | null = null;
@@ -66,10 +68,11 @@ export async function createSpaceAction(
     const supabase = await createClient();
     const { data, error } = await supabase.rpc('create_space', {
       p_name: name,
-      p_type: type,
-      p_starts_on: startsOn,
-      p_ends_on: endsOn,
-      p_budget_minor: budgetMinor,
+      p_type: spaceType,
+      // The SQL defaults for the optional args are null, so undefined means the same thing.
+      p_starts_on: startsOn ?? undefined,
+      p_ends_on: endsOn ?? undefined,
+      p_budget_minor: budgetMinor ?? undefined,
       p_members: members,
     });
     if (error) return { error: friendlyDbError(error.message) };

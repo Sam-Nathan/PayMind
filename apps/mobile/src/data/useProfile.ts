@@ -13,6 +13,7 @@ export function useProfile() {
     queryKey: qk.profile(uid),
     enabled: !!uid,
     queryFn: async (): Promise<Profile | null> => {
+      if (!uid) throw new Error('Not signed in.');
       const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
       if (error) throw error;
       return data ? mapProfile(data as ProfileRow) : null;

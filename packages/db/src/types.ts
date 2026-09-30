@@ -1568,6 +1568,10 @@ export type Database = {
         }
         Returns: string
       }
+      consume_rate_limit: {
+        Args: { p_bucket: string; p_limit: number; p_window_seconds?: number }
+        Returns: boolean
+      }
       create_expense: { Args: { p: Json }; Returns: string }
       create_space: {
         Args: {

@@ -126,4 +126,4 @@ supabase/functions/
 - Deploy: `supabase functions deploy <name>` from the repo root (or the Supabase MCP `deploy_edge_function`, passing `_shared/*` files with the function's files).
 - The zod schemas are vendored: run `node scripts/sync-edge-shared.mjs` after editing `packages/core/src/schemas.ts`
   (it also rewrites the import to `npm:zod@4` and maps `bank_transfer` to `bank`).
-- The deployed `_shared/schemas.ts` for the MCP-deployed versions is a trimmed subset (primitives + AI output schemas); redeploying with the CLI ships the full file.
+- Deploys ship the full `_shared/schemas.ts` (vendored from packages/core via `scripts/sync-edge-shared.mjs`). When deploying via the Supabase MCP, pass `deno.json` as the import map (`import_map_path: "deno.json"`) and name shared files `../_shared/...`.

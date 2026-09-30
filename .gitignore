@@ -19,3 +19,5 @@ supabase/.temp/
 supabase/.branches/
 .DS_Store
 *.log
+next-env.d.ts
+expo-env.d.ts

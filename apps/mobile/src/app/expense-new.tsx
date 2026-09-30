@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -32,6 +32,8 @@ import {
 import type { PaidVia, SplitMethod } from '../data/types.ts';
 import { useCategories, useCreateExpense } from '../data/useExpenses.ts';
 import { findMyMember, useSpaceMembers, useSpaces } from '../data/useSpaces.ts';
+import { useDefaultSplit } from '../features/spaces/data.ts';
+import { defaultSplitForExpense } from '../features/spaces/logic.ts';
 import { useAuth } from '../providers/AuthProvider.tsx';
 
 type Picker = 'category' | 'space' | 'paidBy' | null;
@@ -76,12 +78,34 @@ export default function ExpenseNew() {
   const members = useMemo(() => (spaceId ? (membersQ.data ?? []).filter((m) => !m.leftAt) : []), [spaceId, membersQ.data]);
   const me = findMyMember(members, uid);
 
+  // A couple space carries its "How you share" choice in spaces.default_split; new expenses start from it.
+  const spaceType = spaceId ? spaces.data?.find((s) => s.id === spaceId)?.type : undefined;
+  const defaultSplitQ = useDefaultSplit(spaceType === 'couple' ? spaceId ?? undefined : undefined);
+  const appliedDefaultFor = useRef<string | null>(null);
+
   // Default the payer to me once members load (and whenever the space changes).
   useEffect(() => {
     setPaidBy(me?.id ?? null);
     setParticipants(null);
     setValues({});
+    setMethod('equal');
+    appliedDefaultFor.current = null;
   }, [spaceId, me?.id]);
+
+  useEffect(() => {
+    if (!spaceId || spaceType !== 'couple' || !defaultSplitQ.isSuccess || members.length === 0) return;
+    if (appliedDefaultFor.current === spaceId) return;
+    appliedDefaultFor.current = spaceId;
+    const d = defaultSplitForExpense(defaultSplitQ.data, members.map((m) => m.id));
+    if (!d) return;
+    if (d.method === 'equal') {
+      setMethod('equal');
+      setParticipants(new Set(d.memberIds));
+    } else {
+      setMethod('ratio');
+      setValues(Object.fromEntries(Object.entries(d.weights).map(([id, w]) => [id, String(w)])));
+    }
+  }, [spaceId, spaceType, defaultSplitQ.isSuccess, defaultSplitQ.data, members]);
 
   const totalMinor = parseAmountInput(amount);
   const activeIds = participants ?? new Set(members.map((m) => m.id));

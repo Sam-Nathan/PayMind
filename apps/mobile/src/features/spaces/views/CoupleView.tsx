@@ -1,3 +1,4 @@
+import { paiseToRupeeString } from '@paymind/core';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -61,11 +62,13 @@ export function CoupleView({ ctx }: { ctx: SpaceCtx }) {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     setPreset(parsed.preset);
-    setFixedText(parsed.fixedPartnerMinor ? String(parsed.fixedPartnerMinor / 100) : '');
+    setFixedText(parsed.fixedPartnerMinor ? paiseToRupeeString(parsed.fixedPartnerMinor).replace(/\.00$/, '') : '');
   }, [parsed.preset, parsed.fixedPartnerMinor]);
 
   const fixedMinor = parseAmountInput(fixedText) ?? 0;
-  const split = partner ? coupleSplit(total, preset, me.id, partner.id, fixedMinor) : null;
+  // The stored rule may have been written by the partner (their 60 is my 40; their fixed amount is mine).
+  const flipped = preset === parsed.preset && parsed.flipped;
+  const split = partner ? coupleSplit(total, preset, me.id, partner.id, fixedMinor, flipped) : null;
   const status = coupleStatus(myPaid, split?.myShareMinor ?? 0, partnerName);
 
   const save = async (next: SharePreset, fixed = fixedMinor) => {
@@ -74,7 +77,11 @@ export function CoupleView({ ctx }: { ctx: SpaceCtx }) {
     const before = preset;
     setPreset(next);
     try {
-      await setSplit.mutateAsync(presetToDefaultSplit(next, me.id, partner.id, fixed));
+      // Keep who covers the fixed amount when re-saving it from the other side.
+      const keepSide = next === 'fixed' && flipped;
+      await setSplit.mutateAsync(
+        keepSide ? presetToDefaultSplit(next, partner.id, me.id, fixed) : presetToDefaultSplit(next, me.id, partner.id, fixed),
+      );
     } catch (e) {
       setPreset(before);
       setError(friendlyError(e));
@@ -142,7 +149,7 @@ export function CoupleView({ ctx }: { ctx: SpaceCtx }) {
                 <View className="mt-3 flex-row items-end gap-2">
                   <View className="flex-1">
                     <TextField
-                      label={`${partnerName} pays, per month`}
+                      label={flipped ? 'You pay, per month' : `${partnerName} pays, per month`}
                       prefix="₹"
                       value={fixedText}
                       onChangeText={setFixedText}

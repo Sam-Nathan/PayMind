@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { applySplitRule, SplitRuleSchema, type SplitRule } from '@paymind/core';
 import {
   billKindOf,
   billShares,
@@ -6,6 +7,7 @@ import {
   categoryBreakdown,
   coupleSplit,
   coupleStatus,
+  defaultSplitForExpense,
   defaultSplitToPreset,
   inclusiveDays,
   inviteMessage,
@@ -127,11 +129,52 @@ describe('couple split presets', () => {
       expect(defaultSplitToPreset(ds, 'me', 'her').preset).toBe(preset);
     }
     const fixed = presetToDefaultSplit('fixed', 'me', 'her', 500000);
-    expect(defaultSplitToPreset(fixed, 'me', 'her')).toEqual({ preset: 'fixed', fixedPartnerMinor: 500000 });
+    expect(defaultSplitToPreset(fixed, 'me', 'her')).toEqual({ preset: 'fixed', fixedPartnerMinor: 500000, flipped: false });
   });
-  it('stores a core-compatible rule', () => {
+  it('stores a core-valid SplitRule for every preset', () => {
     expect(presetToDefaultSplit('60-40', 'me', 'her')).toEqual({ method: 'ratio', ratio: { me: 60, her: 40 } });
     expect(presetToDefaultSplit('50-50', 'me', 'her')).toEqual({ method: 'equal', members: ['me', 'her'] });
+    for (const preset of ['50-50', '60-40', '70-30', 'fixed', 'item'] as const) {
+      const ds = presetToDefaultSplit(preset, 'me', 'her', 250000);
+      const rule = SplitRuleSchema.parse(ds) as SplitRule;
+      const shares = applySplitRule(10001, rule);
+      expect(Object.values(shares).reduce((a, b) => a + b, 0)).toBe(10001);
+    }
+  });
+  it('reads the rule from the partner\'s side', () => {
+    const ds = presetToDefaultSplit('60-40', 'me', 'her');
+    expect(defaultSplitToPreset(ds, 'her', 'me')).toEqual({ preset: '60-40', fixedPartnerMinor: 0, flipped: true });
+    const s = coupleSplit(1000, '60-40', 'her', 'me', 0, true);
+    expect(s).toMatchObject({ myShareMinor: 400, partnerShareMinor: 600, myPercent: 40 });
+    const fixed = presetToDefaultSplit('fixed', 'me', 'her', 300);
+    expect(defaultSplitToPreset(fixed, 'her', 'me')).toEqual({ preset: 'fixed', fixedPartnerMinor: 300, flipped: true });
+    expect(coupleSplit(1000, 'fixed', 'her', 'me', 300, true)).toMatchObject({ myShareMinor: 300, partnerShareMinor: 700 });
+  });
+  it('tolerates the legacy shapes written before round 3', () => {
+    expect(defaultSplitToPreset({ method: 'by_item' }, 'me', 'her').preset).toBe('item');
+    expect(defaultSplitToPreset({ method: 'fixed', amounts: { her: 500000 } }, 'me', 'her')).toEqual({
+      preset: 'fixed',
+      fixedPartnerMinor: 500000,
+      flipped: false,
+    });
+    expect(defaultSplitForExpense({ method: 'by_item' }, ['me', 'her'])).toBeNull();
+    expect(defaultSplitForExpense({ method: 'fixed', amounts: { her: 5 } }, ['me', 'her'])).toBeNull();
+  });
+  it('turns a default split into expense-new inputs', () => {
+    expect(defaultSplitForExpense(presetToDefaultSplit('70-30', 'me', 'her'), ['me', 'her'])).toEqual({
+      method: 'ratio',
+      weights: { me: 70, her: 30 },
+    });
+    expect(defaultSplitForExpense(presetToDefaultSplit('fixed', 'me', 'her', 9), ['me', 'her'])).toEqual({
+      method: 'equal',
+      memberIds: ['me', 'her'],
+    });
+    expect(defaultSplitForExpense({ method: 'equal', members: ['me', 'gone'] }, ['me', 'her'])).toEqual({
+      method: 'equal',
+      memberIds: ['me'],
+    });
+    expect(defaultSplitForExpense({ method: 'equal' }, ['me'])).toBeNull();
+    expect(defaultSplitForExpense(null, ['me'])).toBeNull();
   });
   it('defaults to 50/50 when nothing usable is stored', () => {
     expect(defaultSplitToPreset(null, 'me', 'her').preset).toBe('50-50');

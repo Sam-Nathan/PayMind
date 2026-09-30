@@ -218,50 +218,112 @@ export const SHARE_PRESETS: readonly { value: SharePreset; label: string }[] = [
   { value: 'item', label: 'By item' },
 ];
 
-/** The JSON stored in `spaces.default_split` (SplitRule-shaped; 'by_item' has no params). */
+/**
+ * The JSON stored in `spaces.default_split`. Always a valid core `SplitRule` (SplitRuleSchema), so any
+ * reader can `applySplitRule` it to one expense. "Fixed ₹" (a monthly amount the partner covers) and
+ * "By item" have no per-expense rule: they are stored as an equal rule plus `preset` metadata, which
+ * zod ignores and the couple screen reads back.
+ */
 export function presetToDefaultSplit(
   preset: SharePreset,
   meId: string,
   partnerId: string,
   fixedPartnerMinor = 0,
 ): Record<string, unknown> {
+  const equal = { method: 'equal', members: [meId, partnerId] };
   switch (preset) {
     case '50-50':
-      return { method: 'equal', members: [meId, partnerId] };
+      return equal;
     case '60-40':
       return { method: 'ratio', ratio: { [meId]: 60, [partnerId]: 40 } };
     case '70-30':
       return { method: 'ratio', ratio: { [meId]: 70, [partnerId]: 30 } };
     case 'fixed':
-      return { method: 'fixed', amounts: { [partnerId]: Math.max(0, Math.round(fixedPartnerMinor)) } };
+      return {
+        ...equal,
+        preset: 'fixed',
+        fixed_member: partnerId,
+        fixed_minor: Number.isSafeInteger(fixedPartnerMinor) && fixedPartnerMinor > 0 ? fixedPartnerMinor : 0,
+      };
     case 'item':
-      return { method: 'by_item' };
+      return { ...equal, preset: 'item' };
   }
 }
 
+export interface ParsedCouplePreset {
+  preset: SharePreset;
+  /** the fixed monthly amount (paise) carried by `fixedMember` */
+  fixedPartnerMinor: number;
+  /**
+   * The stored rule was written from the partner's side: for 60/40 or 70/30 the viewer has the
+   * smaller part, and for "Fixed ₹" the viewer is the one covering the fixed amount.
+   */
+  flipped: boolean;
+}
+
+/**
+ * Reads `spaces.default_split` back into a preset from the viewer's side. Tolerates the legacy
+ * shapes written before round 3 (`{method:'fixed', amounts:{partner:X}}`, `{method:'by_item'}`).
+ */
 export function defaultSplitToPreset(
   ds: unknown,
   meId: string | undefined,
   partnerId: string | undefined,
-): { preset: SharePreset; fixedPartnerMinor: number } {
-  const fallback = { preset: '50-50' as SharePreset, fixedPartnerMinor: 0 };
-  if (!ds || typeof ds !== 'object' || !meId || !partnerId) return fallback;
+): ParsedCouplePreset {
+  const fallback: ParsedCouplePreset = { preset: '50-50', fixedPartnerMinor: 0, flipped: false };
+  if (!ds || typeof ds !== 'object' || Array.isArray(ds) || !meId || !partnerId) return fallback;
   const d = ds as Record<string, unknown>;
-  if (d['method'] === 'by_item') return { preset: 'item', fixedPartnerMinor: 0 };
+  const minor = (v: unknown) => (typeof v === 'number' && Number.isSafeInteger(v) && v > 0 ? v : 0);
+  if (d['preset'] === 'item' || d['method'] === 'by_item') return { ...fallback, preset: 'item' };
+  if (d['preset'] === 'fixed') {
+    return { preset: 'fixed', fixedPartnerMinor: minor(d['fixed_minor']), flipped: d['fixed_member'] === meId };
+  }
   if (d['method'] === 'fixed') {
-    const a = (d['amounts'] as Record<string, unknown> | undefined)?.[partnerId];
-    return { preset: 'fixed', fixedPartnerMinor: typeof a === 'number' ? a : 0 };
+    // legacy: { amounts: { <member who covers the fixed amount>: X } }
+    const a = (d['amounts'] ?? {}) as Record<string, unknown>;
+    if (a[partnerId] !== undefined) return { preset: 'fixed', fixedPartnerMinor: minor(a[partnerId]), flipped: false };
+    if (a[meId] !== undefined) return { preset: 'fixed', fixedPartnerMinor: minor(a[meId]), flipped: true };
+    return { ...fallback, preset: 'fixed' };
   }
   if (d['method'] === 'ratio') {
     const r = (d['ratio'] ?? {}) as Record<string, unknown>;
     const mine = Number(r[meId]);
     const theirs = Number(r[partnerId]);
     const key = `${mine}-${theirs}`;
-    if (key === '50-50') return { preset: '50-50', fixedPartnerMinor: 0 };
-    if (key === '60-40' || key === '70-30') return { preset: key, fixedPartnerMinor: 0 };
+    if (key === '50-50') return fallback;
+    if (key === '60-40' || key === '70-30') return { preset: key, fixedPartnerMinor: 0, flipped: false };
+    if (key === '40-60') return { preset: '60-40', fixedPartnerMinor: 0, flipped: true };
+    if (key === '30-70') return { preset: '70-30', fixedPartnerMinor: 0, flipped: true };
     return fallback;
   }
   return fallback;
+}
+
+/** How expense-new should pre-fill its split from `spaces.default_split` (null = leave the default). */
+export type ExpenseSplitDefault =
+  | { method: 'equal'; memberIds: string[] }
+  | { method: 'ratio'; weights: Record<string, number> };
+
+/**
+ * Turns a stored default split into expense-new's per-expense inputs, limited to the active members.
+ * Presets without a per-expense rule (Fixed ₹ monthly, By item) and legacy shapes fall back to equal.
+ */
+export function defaultSplitForExpense(ds: unknown, activeIds: readonly string[]): ExpenseSplitDefault | null {
+  if (!ds || typeof ds !== 'object' || Array.isArray(ds) || activeIds.length === 0) return null;
+  const d = ds as Record<string, unknown>;
+  const active = new Set(activeIds);
+  if (d['method'] === 'ratio' && d['preset'] === undefined) {
+    const weights: Record<string, number> = {};
+    for (const [id, w] of Object.entries((d['ratio'] ?? {}) as Record<string, unknown>)) {
+      if (active.has(id) && typeof w === 'number' && Number.isFinite(w) && w > 0) weights[id] = w;
+    }
+    return Object.keys(weights).length > 0 ? { method: 'ratio', weights } : null;
+  }
+  if (d['method'] === 'equal' && Array.isArray(d['members'])) {
+    const ids = (d['members'] as unknown[]).filter((m): m is string => typeof m === 'string' && active.has(m));
+    return ids.length > 0 ? { method: 'equal', memberIds: ids } : null;
+  }
+  return null;
 }
 
 export interface CoupleSplit {
@@ -280,7 +342,18 @@ export function coupleSplit(
   meId: string,
   partnerId: string,
   fixedPartnerMinor = 0,
+  flipped = false,
 ): CoupleSplit {
+  if (flipped && preset !== '50-50' && preset !== 'item') {
+    // Same rule seen from the other side: compute for the partner, then swap.
+    const other = coupleSplit(totalMinor, preset, partnerId, meId, fixedPartnerMinor, false);
+    return {
+      myShareMinor: other.partnerShareMinor,
+      partnerShareMinor: other.myShareMinor,
+      myPercent: 100 - other.myPercent,
+      perItem: other.perItem,
+    };
+  }
   if (totalMinor <= 0) return { myShareMinor: 0, partnerShareMinor: 0, myPercent: preset === '60-40' ? 60 : preset === '70-30' ? 70 : 50, perItem: preset === 'item' };
   if (preset === '50-50' || preset === 'item') {
     const s = splitEqual(totalMinor, [meId, partnerId]);
@@ -473,7 +546,7 @@ export function inviteMessage(spaceName: string, code: string): string {
 /** Accepts a bare code or a pasted `paymind://invite/CODE` link. Returns null if it can't be a code. */
 export function parseInviteCode(input: string): string | null {
   const t = input.trim();
-  const m = /invite\/([A-Za-z0-9]+)/i.exec(t);
+  const m = /invite\/([A-Za-z0-9-]+)/i.exec(t);
   const code = (m ? (m[1] as string) : t).replace(/[\s-]/g, '').toUpperCase();
   return /^[A-Z0-9]{4,16}$/.test(code) ? code : null;
 }

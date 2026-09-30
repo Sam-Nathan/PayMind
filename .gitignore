@@ -21,3 +21,4 @@ supabase/.branches/
 *.log
 next-env.d.ts
 expo-env.d.ts
+.claude/worktrees/

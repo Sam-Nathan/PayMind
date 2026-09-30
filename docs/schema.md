@@ -1,7 +1,7 @@
 # PayMind database schema (v1)
 
 This is the contract that clients and Edge Functions code against. The source of truth is
-`supabase/migrations/20260930000001..05_init_*.sql`. The tests are in `supabase/tests/*.test.sql`.
+`supabase/migrations/20260930000001..05_init_*.sql` plus later migrations (`..07_perf.sql`). The tests are in `supabase/tests/*.test.sql`.
 Run them with `supabase test db`, or run `supabase/scripts/test_local.sh` against a plain Postgres.
 
 **Conventions:**
@@ -98,6 +98,7 @@ Every table also has `created_at`. Mutable tables also have `updated_at`, which 
 **Implementation notes:**
 - Policies use `(select auth.uid())`.
 - Membership checks go through the `SECURITY DEFINER` helpers `private.my_space_ids()`, `my_owned_space_ids()` and `my_member_ids()`. They are evaluated once per query, and they avoid recursion on `space_members`.
+- SELECT policies use the index-friendly form `space_id = any (array(select private.my_space_ids()))` (migration 07). The `in (select ...)` form is a hashed filter that forces a sequential scan of the whole table.
 - The `private` schema is not exposed through the API.
 
 ## Money invariants (enforced by the database)

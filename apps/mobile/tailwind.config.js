@@ -30,7 +30,6 @@ module.exports = {
         'sans-semibold': ['Onest_600SemiBold'],
         'sans-bold': ['Onest_700Bold'],
         display: ['Doto_700Bold'],
-        'display-regular': ['Doto_400Regular'],
       },
     },
   },

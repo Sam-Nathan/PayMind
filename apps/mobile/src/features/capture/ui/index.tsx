@@ -1,29 +1,14 @@
 /**
- * Minimal local UI primitives for the capture / privacy / upi screens.
- * They follow docs/design/components.md and will be swapped for the shared component library
- * (src/components) when the branches merge.
+ * Small layout helpers for the capture / privacy screens. Colours, Card and Button come from the
+ * shared component library (src/components); only screen-specific pieces live here.
  */
-import { ActivityIndicator, Pressable, ScrollView, Switch, Text, View, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import type { ReactNode } from 'react';
+import { Button as BaseButton, type ButtonVariant } from '../../../components/Button.tsx';
+import { palette } from '../../../components/theme.ts';
 
-export const palette = {
-  oxblood: '#6E1F1B',
-  signal: '#B3261E',
-  ink: '#232833',
-  steel: '#BCCCD6',
-  clay: '#E3A06F',
-  paper: '#F7F5F0',
-  white: '#FFFFFF',
-  muted: '#6A6459',
-  sand: '#EDE7DB',
-  peach: '#F6E3D5',
-  mist: '#EDF3F6',
-  blush: '#FAEBE7',
-  slate: '#2F4A5D',
-  rust: '#994516',
-  stone: '#CBC2B3',
-  hairline: '#E9E4DA',
-} as const;
+export { palette };
+export { Card } from '../../../components/Card.tsx';
 
 /** Scrolling page body: paper background, 16 px gutters. */
 export function Screen({ children, bottomPad = 32 }: { children: ReactNode; bottomPad?: number }) {
@@ -38,48 +23,17 @@ export function Screen({ children, bottomPad = 32 }: { children: ReactNode; bott
   );
 }
 
-type CardTone = 'white' | 'ink' | 'mist' | 'peach' | 'sand';
-const cardTone: Record<CardTone, string> = {
-  white: 'bg-white border border-[#E9E4DA]',
-  ink: 'bg-ink',
-  mist: 'bg-[#EDF3F6]',
-  peach: 'bg-[#F6E3D5]',
-  sand: 'bg-[#EDE7DB]',
-};
-
-export function Card({
-  tone = 'white',
-  children,
-  style,
-}: {
-  tone?: CardTone;
-  children: ReactNode;
-  style?: ViewStyle;
-}) {
-  return (
-    <View className={`rounded-[24px] p-4 ${cardTone[tone]}`} style={style}>
-      {children}
-    </View>
-  );
-}
-
 type ButtonTone = 'primary' | 'outline' | 'danger' | 'signal' | 'quiet';
 
-const buttonBox: Record<ButtonTone, string> = {
-  primary: 'bg-ink',
-  outline: 'bg-white border border-[#E9E4DA]',
-  danger: 'bg-white border-[1.5px] border-signal',
-  signal: 'bg-signal',
-  quiet: 'bg-transparent',
-};
-const buttonText: Record<ButtonTone, string> = {
-  primary: 'text-paper',
-  outline: 'text-ink',
-  danger: 'text-signal',
-  signal: 'text-white',
-  quiet: 'text-text-muted',
+const VARIANT: Record<ButtonTone, ButtonVariant> = {
+  primary: 'dark',
+  outline: 'outline',
+  danger: 'destructiveOutline',
+  signal: 'primary',
+  quiet: 'ghost',
 };
 
+/** The shared Button with this module's older `tone` / `flex` prop names. */
 export function Button({
   label,
   onPress,
@@ -99,28 +53,17 @@ export function Button({
   flex?: boolean;
   testID?: string;
 }) {
-  const off = disabled || loading;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled: !!off, busy: !!loading }}
-      testID={testID}
-      disabled={off}
+    <BaseButton
+      label={label}
       onPress={onPress}
-      className={`items-center justify-center ${size === 'lg' ? 'h-14 rounded-[18px]' : 'h-11 rounded-[16px]'} ${buttonBox[tone]} ${
-        off ? 'opacity-50' : 'active:opacity-80'
-      }`}
-      style={flex ? { flex: 1 } : undefined}
-    >
-      {loading ? (
-        <ActivityIndicator color={tone === 'primary' || tone === 'signal' ? palette.paper : palette.ink} />
-      ) : (
-        <Text className={`${size === 'lg' ? 'text-[17px]' : 'text-[15px]'} font-sans-semibold ${buttonText[tone]}`}>
-          {label}
-        </Text>
-      )}
-    </Pressable>
+      variant={VARIANT[tone]}
+      size={size === 'lg' ? 'lg' : 'sm'}
+      disabled={disabled || loading}
+      loading={loading}
+      full={flex}
+      testID={testID}
+    />
   );
 }
 
@@ -132,15 +75,6 @@ export function Overline({ children }: { children: ReactNode }) {
     >
       {children}
     </Text>
-  );
-}
-
-export function Pill({ label, tone = 'sand' }: { label: string; tone?: 'sand' | 'peach' | 'mist' }) {
-  const bg = tone === 'peach' ? 'bg-[#F6E3D5]' : tone === 'mist' ? 'bg-[#EDF3F6]' : 'bg-[#EDE7DB]';
-  return (
-    <View className={`self-start rounded-pill px-3 py-1 ${bg}`}>
-      <Text className="font-sans-semibold text-[12px] text-ink">{label}</Text>
-    </View>
   );
 }
 

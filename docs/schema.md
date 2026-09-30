@@ -44,7 +44,7 @@ Every table also has `created_at`. Mutable tables also have `updated_at`, which 
 |---|---|---|---|
 | `profiles` | id (=auth.users.id), name, phone, upi_vpa, locale (`en-IN`/`hi-IN`/`kn-IN`), currency, avatar_url, deleted_at | the user | the user. The row is auto-created at sign-up. |
 | `spaces` | id, type, name, starts_on, ends_on, budget_minor, currency, default_split jsonb, status, created_by | active members and the creator | space owners (update/delete). Create it with `create_space`. |
-| `space_members` | id, space_id, user_id (null = not on the app or a former member), display_name, upi_vpa, role, share_weight, joined_at, left_at | members of the space, and your own rows | owners: any row. Members: can add `member` rows. Anyone: can update their own row (e.g. set `left_at` to leave). `user_id` can't be changed, and only owners can change `role`. |
+| `space_members` | id, space_id, user_id (null = not on the app or a former member), display_name, upi_vpa, role, share_weight, joined_at, left_at | members of the space, and your own rows | owners: any row. Members: can add `member` rows. Anyone: can update their own row (e.g. set `left_at` to leave). `user_id` can't be changed, only owners can change `role` or restore a former member (`left_at` → null), and only the linked user can change their own `upi_vpa`. |
 | `split_rules` | space_id, name, bill_kind, method, params jsonb | members | members |
 | `categories` | id, parent_id, owner_id (null = system), slug (system rows), name, icon, sort_order | system rows plus your own | your own rows |
 | `merchants` / `merchant_aliases` | canonical_name, category_id, owner_id / merchant_id, raw_text (trigram index), vpa (lower-case), owner_id | global rows plus your own | your own rows. Global rows are written by service_role. |
@@ -109,6 +109,14 @@ Every table also has `created_at`. Mutable tables also have `updated_at`, which 
 - The item shares of each item must add up to that item's amount.
 - If **every** item has shares, then each member's item-share total must equal their `expense_shares.owed_minor`.
 
+## Settlement trust model (decided in the security review, migration 09)
+
+UPI apps return no reliable callback, so the **payer may self-report** a payment (`completed`, or
+`confirmed_manual` for cash), and a space owner may record one for others. The **payee can always
+dispute** it: any party (or a space owner) can move it to `cancelled`, or to `corrected` with the right
+amount. Members who are not a party cannot touch a settlement. API callers can't change `created_by`
+or set `completed_at` (the trigger owns it).
+
 ## Settlement state machine (trigger `private.guard_settlement`, applies to every writer)
 
 ```
@@ -142,7 +150,8 @@ cancelled        -> terminal
 | `update_settlement_status(p_id uuid, p_status settlement_status, p_utr text = null, p_amount_minor bigint = null)` | `settlements` row | `p_amount_minor` is required for `corrected`. Passing the same status is allowed (e.g. to add a UTR). |
 | `confirm_captured_txn(p_id uuid, p_category_id uuid = null, p_space_id uuid = null, p_shares jsonb = null)` | `uuid` expense id | The inbox item must be `inbox`. With no `p_space_id` it creates a personal expense. With `p_space_id` it needs `p_shares` (`[{member_id, owed_minor}]`), and the caller is the payer. It matches the merchant by `vpa`. `source` maps as follows: upi_notification→upi_alert, sms→sms, ebill→ebill, manual→manual. For "Not mine", update `status='not_mine'` directly. |
 | `delete_my_account()` | `void` | `SECURITY DEFINER`, because it deletes the `auth.users` row. A trigger then deletes personal data (personal expenses, notes, inbox, proposals, rules, budgets, goals, devices, settings, profile) and anonymises shared rows: member rows become `display_name='Former member'`, `user_id=null`, `left_at=now()`, and shared expenses get `owner_id=null`. Balances stay intact. If the user was a space's last owner, the longest-standing active member is promoted. The same trigger also runs for deletions made from the dashboard or the admin API. **The Edge Function must delete Storage receipts first.** |
-| `register_device(p_token text, p_platform device_platform, p_app_version text = null)` | `uuid` | `SECURITY DEFINER`, so it can move a token that another account registered on the same phone. |
+| `register_device(p_token text, p_platform device_platform, p_app_version text = null)` | `uuid` | `SECURITY DEFINER`, so it can move a token that another account registered on the same phone. The token must look like `ExponentPushToken[...]` (≤ 200 chars). |
+| `consume_rate_limit(p_bucket text, p_limit int, p_window_seconds int = 3600)` | `boolean` | Per-user fixed-window counter used by the Edge Functions. `false` = over the limit. |
 
 **`create_expense` payload:**
 
@@ -173,9 +182,12 @@ Errors are raised as `'<code>: detail'`. Match on the code prefix.
 - **`22023` (invalid input):** `invalid_payload`, `invalid_total`, `invalid_amount`, `invalid_members`, `member_display_name_required`, `paid_by_member_required`, `paid_by_member_not_allowed_on_personal_expense`, `payer_not_in_space`, `shares_required`, `shares_not_allowed_on_personal_expense`, `invalid_share`, `duplicate_share_member`, `shares_sum_mismatch`, `share_member_not_in_space`, `items_sum_mismatch`, `invalid_item_share`, `item_shares_sum_mismatch`, `item_shares_not_allowed_on_personal_expense`, `item_shares_member_mismatch`, `illegal_initial_settlement_status`, `illegal_settlement_transition`, `settlement_amount_locked`, `correction_requires_new_amount`, `settlement_member_not_in_space`, `settlement_parties_immutable`, `captured_txn_not_in_inbox`, `member_user_id_immutable`, `member_space_immutable`, `settlement_created_by_immutable`, `expense_owner_immutable`, `invalid_token`.
 - **`23514`:** `shares_sum_mismatch` from the deferred commit check. The check constraint `expenses_proposed_personal_only` also uses this code.
 
+- **`42501` (migration 09):** `only_space_owner_can_restore_member`, `member_upi_vpa_owner_only`; RLS refuses `captured_txns` inserts from notifications/SMS (e-bills) unless `privacy_settings.capture_notifications` (`ebills`) is on.
+- **`23514` (migration 09):** length limits: names/display names ≤ 80, VPAs ≤ 100, titles/item names ≤ 200, notes/messages ≤ 2000.
+
 ## Realtime
 
-The `supabase_realtime` publication includes `expenses`, `expense_shares`, `settlements` and `captured_txns`. RLS applies to what each subscriber receives.
+The `supabase_realtime` publication includes `expenses`, `expense_shares`, `settlements` and `captured_txns`. RLS applies to what each subscriber receives for INSERT and UPDATE. DELETE events are not RLS-filtered by Realtime, but carry only the primary key.
 
 ## Invites, pay links, receipts (migrations 06 and 08)
 

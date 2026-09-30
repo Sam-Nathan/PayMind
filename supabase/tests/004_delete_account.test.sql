@@ -38,6 +38,7 @@ insert into ids select 'parasailing', public.create_expense(jsonb_build_object(
     jsonb_build_object('member_id', (select v from ids where k = 'm_rahul'), 'owed_minor', 150000),
     jsonb_build_object('member_id', (select v from ids where k = 'm_priya'), 'owed_minor', 150000))));
 insert into ids select 'rahul_personal', public.create_expense('{"title": "Uber", "total_minor": 21200}'::jsonb);
+update public.privacy_settings set capture_notifications = true where user_id = (select auth.uid());
 insert into public.captured_txns (source, amount_minor, payee, occurred_at, dedupe_hash)
   values ('sms', 50000, 'Metro card', now(), 'm1');
 insert into public.learned_rules (kind, match, action) values ('merchant', '{"raw": "UBERRIDES BLR"}', '{"merchant": "Uber"}');

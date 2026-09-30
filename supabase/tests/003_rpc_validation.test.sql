@@ -180,6 +180,8 @@ select throws_like(
   'illegal_settlement_transition: cancelled -> completed%', 'cancelled is terminal');
 
 -- Captured txn -> personal expense --------------------------------------------------------------
+-- Capture needs the user's opt-in (enforced by RLS since migration 09).
+update public.privacy_settings set capture_notifications = true where user_id = (select auth.uid());
 insert into public.captured_txns (source, amount_minor, payee, vpa, occurred_at, dedupe_hash)
 values ('upi_notification', 24000, 'Brew Street Café', 'BREWSTREET@ybl', now(), 'h1');
 insert into ids select 'cap', id from public.captured_txns where dedupe_hash = 'h1';

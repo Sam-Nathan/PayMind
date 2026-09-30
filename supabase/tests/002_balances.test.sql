@@ -15,8 +15,14 @@ set local role authenticated;
 set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 insert into ids select 'space', public.create_space(
   'Friends', 'friends', null, null, null,
-  '[{"display_name": "Rahul", "user_id": "22222222-2222-2222-2222-222222222222"},
-    {"display_name": "Priya", "user_id": "33333333-3333-3333-3333-333333333333"}]'::jsonb);
+  '[{"display_name": "Rahul"},
+    {"display_name": "Priya"}]'::jsonb);
+-- Link placeholders to real users (clients may not do this; the invite flow does, see 005).
+reset role;
+update public.space_members set user_id = '22222222-2222-2222-2222-222222222222' where display_name = 'Rahul' and space_id = (select v from ids where k = 'space');
+update public.space_members set user_id = '33333333-3333-3333-3333-333333333333' where display_name = 'Priya' and space_id = (select v from ids where k = 'space');
+set local role authenticated;
+set local request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 insert into ids select 'm_sunny', id from public.space_members where user_id = '11111111-1111-1111-1111-111111111111';
 insert into ids select 'm_rahul', id from public.space_members where user_id = '22222222-2222-2222-2222-222222222222';
 insert into ids select 'm_priya', id from public.space_members where user_id = '33333333-3333-3333-3333-333333333333';

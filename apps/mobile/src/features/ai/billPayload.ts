@@ -63,6 +63,9 @@ export function buildBillExpensePayload(args: {
   const title = draft.merchant.trim() || 'Bill';
   const lines = draftLines(draft);
   if (draft.items.length === 0) throw new ValidationError('Add at least one item.');
+  // expense_items_sign: only discounts may be negative (a parsed or edited line could be).
+  const badLine = lines.find((l) => (l.kind === 'discount' ? l.amountMinor > 0 : l.amountMinor < 0));
+  if (badLine) throw new ValidationError(`“${badLine.name || 'A line'}” can’t be a negative amount.`);
   const totals = computeTotals(draft);
   const total = totals.totalMinor;
   if (total <= 0) throw new ValidationError('The bill total has to be more than zero.');

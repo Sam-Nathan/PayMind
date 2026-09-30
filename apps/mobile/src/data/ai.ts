@@ -180,7 +180,8 @@ export interface AssistantMessage {
 
 /** The function takes 1 to 20 messages and the last must be the user's. */
 export function trimConversation(messages: readonly AssistantMessage[]): AssistantMessage[] {
-  const recent = messages.slice(-20);
+  // The function also rejects any message over 2000 characters (a long reply would break the chat).
+  const recent = messages.slice(-20).map((m) => (m.content.length > 2000 ? { ...m, content: m.content.slice(0, 2000) } : m));
   const firstUser = recent.findIndex((m) => m.role === 'user');
   return firstUser <= 0 ? [...recent] : recent.slice(firstUser);
 }
@@ -309,6 +310,13 @@ export function useSaveBillExpense() {
       return data as string;
     },
     onSuccess: async (_id, payload) => {
+      // The draft cache never goes stale on its own: mark it decided so a second Save (back
+      // navigation, double tap) can't create the same expense twice.
+      if (payload.proposal_id) {
+        qc.setQueryData<BillDraftEntry>(aiKeys.draft(payload.proposal_id), (old) =>
+          old ? { ...old, status: payload.proposal_status ?? 'accepted' } : old,
+        );
+      }
       await Promise.all([
         qc.invalidateQueries({ queryKey: qk.expenses }),
         qc.invalidateQueries({ queryKey: qk.balances }),

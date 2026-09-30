@@ -167,6 +167,7 @@ export default function SplitScreen() {
   const approve = async () => {
     if (!result || !state || !me || !spaceId) return;
     setSaveError(null);
+    if (entry && entry.status !== 'pending') return setSaveError('This bill has already been added.');
     try {
       const payload = buildBillExpensePayload({
         draft,

@@ -714,7 +714,8 @@ export interface TimelineItem {
   occurredAt: string;
   /** keyset cursor values */
   cursor: { occurredAt: string; refId: string };
-  route: string;
+  /** where a tap goes; null = nothing to open (there is no expense detail screen yet) */
+  route: string | null;
 }
 
 const SOURCE_TEXT: Record<string, string> = {
@@ -765,7 +766,10 @@ export function mapTimelineEvent(r: TimelineEventRow): TimelineItem | null {
         title: r.title ?? 'Expense',
         subtitle: `${shared ? 'Shared · ' : ''}${src} · ${time}`,
         amountMinor: amount === null ? null : -amount,
-        route: bill ? '/recurring' : shared ? `/split/${r.ref_id}` : `/understand/${r.ref_id}`,
+        // understand/[id] and split/[id] take an ai_proposals id (a bill being added), not an expense
+        // id: opening them with an expense id starts an empty "new bill". Shared expenses open their
+        // space; personal ones have no detail screen yet.
+        route: bill ? '/recurring' : shared ? `/space/${r.space_id}` : null,
       };
     }
     case 'payment': {

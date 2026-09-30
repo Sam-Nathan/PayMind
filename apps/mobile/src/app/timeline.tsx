@@ -61,8 +61,9 @@ export default function TimelineScreen() {
               {g.items.map((it, i) => (
                 <Pressable
                   key={it.key}
-                  onPress={() => router.push(it.route as never)}
-                  accessibilityRole="button"
+                  onPress={it.route ? () => router.push(it.route as never) : undefined}
+                  disabled={!it.route}
+                  accessibilityRole={it.route ? 'button' : 'text'}
                   accessibilityLabel={`${it.badge} ${it.title}`}
                   className={`flex-row items-center gap-3 p-3.5 active:opacity-80 ${i > 0 ? 'border-t border-hairline' : ''}`}
                 >

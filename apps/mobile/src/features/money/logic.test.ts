@@ -386,9 +386,9 @@ describe('timeline', () => {
 
   it('maps event types to badges, signs and routes', () => {
     const exp = mapTimelineEvent(row({}))!;
-    expect(exp).toMatchObject({ badge: 'EXP', amountMinor: -24000, route: '/understand/r1' });
+    expect(exp).toMatchObject({ badge: 'EXP', amountMinor: -24000, route: null });
     expect(exp.subtitle).toMatch(/Auto-captured from UPI alert · 09:00/);
-    expect(mapTimelineEvent(row({ space_id: 's1', detail: 'scan' }))).toMatchObject({ badge: 'SPLIT', route: '/split/r1' });
+    expect(mapTimelineEvent(row({ space_id: 's1', detail: 'scan' }))).toMatchObject({ badge: 'SPLIT', route: '/space/s1' });
     expect(mapTimelineEvent(row({ detail: 'recurring' }))).toMatchObject({ badge: 'BILL', route: '/recurring' });
     expect(mapTimelineEvent(row({ event_type: 'payment', status: 'pending' }))).toMatchObject({ badge: 'PAID', amountMinor: 24000, route: '/verify/r1' });
     expect(mapTimelineEvent(row({ event_type: 'payment', status: 'completed' }))).toMatchObject({ route: '/settle' });

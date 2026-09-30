@@ -1,3 +1,4 @@
+import { paiseToRupeeString } from '@paymind/core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -140,6 +141,7 @@ export default function UnderstandScreen() {
 
   const justMe = async () => {
     setSaveError(null);
+    if (entry && entry.status !== 'pending') return setSaveError('This bill has already been added.');
     try {
       const payload = buildBillExpensePayload({
         draft,
@@ -351,7 +353,7 @@ export default function UnderstandScreen() {
         helper="Tips aren't printed on the bill. Leave it empty if you didn't tip."
         kind="rupees"
         allowEmpty
-        initial={draft.tipMinor > 0 ? (draft.tipMinor / 100).toFixed(2) : ''}
+        initial={draft.tipMinor > 0 ? paiseToRupeeString(draft.tipMinor) : ''}
         onClose={() => setSheet(null)}
         onSave={(_v, minor) => {
           update((d) => setTip(d, minor ?? 0));

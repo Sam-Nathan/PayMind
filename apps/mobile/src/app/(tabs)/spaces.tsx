@@ -20,6 +20,7 @@ import {
 import { dateRange, shortDate } from '../../data/dates.ts';
 import { friendlyError } from '../../data/errors.ts';
 import { useSpaceSummaries } from '../../data/useSpaces.ts';
+import { InviteCodeEntry } from '../../features/spaces/InviteCodeEntry.tsx';
 import type { SpaceSummary } from '../../data/types.ts';
 
 function subtitleFor(s: SpaceSummary): string {
@@ -128,6 +129,8 @@ export default function SpacesScreen() {
           )}
         </>
       )}
+
+      <InviteCodeEntry />
 
       <Card tone="sand" radius={28} padding={18}>
         <Text className="font-sans-bold mb-3 text-[19px] text-ink">Start a space</Text>

@@ -60,6 +60,8 @@ function Routes() {
         <Stack.Screen name="space-new" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="expense-new" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="trip-report/[id]" options={{ title: 'Trip report' }} />
+        <Stack.Screen name="invite/[code]" options={{ title: 'Join a space' }} />
+        <Stack.Screen name="space-invite" options={{ title: 'Invite' }} />
         <Stack.Screen name="reminders" options={{ title: 'Reminders' }} />
         <Stack.Screen name="recurring" options={{ title: 'Recurring' }} />
         <Stack.Screen name="goals" options={{ title: 'Goals' }} />

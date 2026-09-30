@@ -32,6 +32,20 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "cameraPermission": "PayMind uses the camera to read bills you scan.",
+          "photosPermission": "PayMind reads bill photos you choose to upload."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "PayMind uses the microphone so you can say an expense.",
+          "speechRecognitionPermission": "PayMind uses speech recognition to turn what you say into an expense."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",

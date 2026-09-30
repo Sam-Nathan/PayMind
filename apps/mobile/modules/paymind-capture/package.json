@@ -1,0 +1,8 @@
+{
+  "name": "paymind-capture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PayMind local Expo module: Android notification capture (UPI and bank alerts) and UPI app launcher.",
+  "main": "index.ts",
+  "types": "index.ts"
+}

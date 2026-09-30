@@ -11,7 +11,10 @@
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.paymind.app",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": ["phonepe", "tez", "paytmmp", "bhim", "upi"]
+      }
     },
     "android": {
       "package": "com.paymind.app",

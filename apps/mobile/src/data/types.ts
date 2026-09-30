@@ -4,11 +4,10 @@
  * Money is integer paise in a JS number (PostgREST returns int8 as a JSON number).
  * TODO: replace with types generated into @paymind/db once they exist.
  */
-import type { SpaceType } from '@paymind/core';
+import type { PaidVia, SpaceType } from '@paymind/core';
 
-export type { SpaceType };
+export type { PaidVia, SpaceType };
 export type SpaceStatus = 'active' | 'settling' | 'settled' | 'archived';
-export type PaidVia = 'upi' | 'cash' | 'card' | 'bank' | 'wallet' | 'other';
 export type SplitMethod = 'equal' | 'ratio' | 'fixed' | 'shares';
 
 export interface ProfileRow {

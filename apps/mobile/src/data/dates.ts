@@ -23,6 +23,11 @@ export function monthStartIso(now: Date): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
 }
 
+/** Local midnight on the 1st of the month as an ISO datetime (UTC offset), for timestamptz filters. */
+export function monthStartDateTime(now: Date): string {
+  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+}
+
 export function monthEndIso(now: Date): string {
   return toIsoDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
 }

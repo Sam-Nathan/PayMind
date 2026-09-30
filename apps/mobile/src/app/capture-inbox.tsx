@@ -5,13 +5,14 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, TextInput
 import {
   useCapturedHistory,
   useCapturedInbox,
-  useCategories,
   useConfirmCaptured,
   useDismissCaptured,
   usePrivacySettings,
   type CapturedTxn,
-  type Category,
 } from '../features/capture/data.ts';
+import { friendlyError } from '../data/errors.ts';
+import type { Category } from '../data/types.ts';
+import { useCategories } from '../data/useExpenses.ts';
 import { detectRecurringHint } from '../features/capture/recurring.ts';
 import { Button, Card, Empty, Screen, palette } from '../features/capture/ui';
 
@@ -35,13 +36,11 @@ function formatWhen(iso: string, now = new Date()): string {
 function categoryLabel(id: string | null, cats: Category[]): string {
   const c = cats.find((x) => x.id === id);
   if (!c) return 'Uncategorised';
-  const parent = c.parent_id ? cats.find((x) => x.id === c.parent_id) : undefined;
+  const parent = c.parentId ? cats.find((x) => x.id === c.parentId) : undefined;
   return parent ? `${parent.name} · ${c.name}` : c.name;
 }
 
-function errMsg(e: unknown): string {
-  return e instanceof Error ? e.message : 'Something went wrong. Please try again.';
-}
+const errMsg = friendlyError;
 
 export default function CaptureInboxScreen() {
   const router = useRouter();

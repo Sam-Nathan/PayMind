@@ -165,8 +165,7 @@ export function buildCreateExpensePayload(draft: ExpenseDraft): CreateExpensePay
       totalMinor: draft.totalMinor,
       currency: 'INR',
       paidByMember: draft.paidByMember ?? PERSONAL_PAYER_PLACEHOLDER,
-      // the core enum spells "bank" as "bank_transfer"; it is mapped back below
-      paidVia: draft.paidVia === 'bank' ? 'bank_transfer' : draft.paidVia,
+      paidVia: draft.paidVia,
       occurredAt: draft.occurredAt,
       source,
       visibility: shared ? 'shared' : 'personal',
@@ -182,7 +181,7 @@ export function buildCreateExpensePayload(draft: ExpenseDraft): CreateExpensePay
     title,
     total_minor: parsed.totalMinor,
     occurred_at: parsed.occurredAt,
-    paid_via: draft.paidVia,
+    paid_via: parsed.paidVia,
     source: parsed.source,
     status: 'confirmed',
   };

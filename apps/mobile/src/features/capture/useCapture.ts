@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import * as PaymindCapture from '../../../modules/paymind-capture';
 import { supabase } from '../../lib/supabase.ts';
+import { qk } from '../../data/keys.ts';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { queryKeys, usePrivacySettings } from './data.ts';
 import type { IngestItem } from './pipeline.ts';
@@ -58,7 +59,7 @@ export function useCaptureSync() {
     if (!PaymindCapture.isSupported()) return;
     const run = () => {
       void syncCaptureNow().then((r) => {
-        if (r.status === 'done' && r.uploaded > 0) void qc.invalidateQueries({ queryKey: ['captured_txns'] });
+        if (r.status === 'done' && r.uploaded > 0) void qc.invalidateQueries({ queryKey: qk.inbox });
       });
     };
     run();
@@ -106,7 +107,7 @@ export function useCapture() {
 
   const syncNow = useCallback(async () => {
     const r = await syncCaptureNow();
-    void qc.invalidateQueries({ queryKey: ['captured_txns'] });
+    void qc.invalidateQueries({ queryKey: qk.inbox });
     void qc.invalidateQueries({ queryKey: queryKeys.privacy });
     return r;
   }, [qc]);

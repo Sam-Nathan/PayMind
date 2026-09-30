@@ -4,7 +4,12 @@ import { useAuth } from '../providers/AuthProvider.tsx';
 import { supabase } from '../lib/supabase.ts';
 import { qk } from './keys.ts';
 
-const MONEY_TABLES = ['expenses', 'expense_shares', 'settlements'] as const;
+/**
+ * expense_shares is deliberately not subscribed: create_expense / update_expense always write the
+ * parent expenses row too, and one expense has one share row per member, so listening to shares
+ * multiplied the events (and Realtime's per-subscriber RLS checks) for no new information.
+ */
+const MONEY_TABLES = ['expenses', 'settlements'] as const;
 
 /**
  * One Realtime channel for the signed-in user. RLS decides which rows each subscriber receives, so
@@ -26,7 +31,6 @@ export function useRealtimeSync() {
       money = setTimeout(() => {
         void qc.invalidateQueries({ queryKey: qk.expenses });
         void qc.invalidateQueries({ queryKey: qk.balances });
-        void qc.invalidateQueries({ queryKey: qk.spaces });
       }, 250);
     };
     const onInboxChange = () => {

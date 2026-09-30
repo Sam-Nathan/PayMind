@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { supabase } from '../../lib/supabase.ts';
+import { qk } from '../../data/keys.ts';
 
 // ---------------------------------------------------------------------------
 // Types (packages/db types are still a placeholder, so these mirror docs/schema.md)
@@ -67,21 +68,10 @@ export interface CapturedTxn {
   suggested_category_id: string | null;
 }
 
-export interface Category {
-  id: string;
-  parent_id: string | null;
-  name: string;
-  slug: string | null;
-  sort_order: number;
-}
-
 export const queryKeys = {
   privacy: ['privacy_settings'] as const,
   notificationPrefs: ['notification_prefs'] as const,
   learnedRules: ['learned_rules'] as const,
-  capturedInbox: ['captured_txns', 'inbox'] as const,
-  capturedHistory: ['captured_txns', 'history'] as const,
-  categories: ['categories'] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -210,31 +200,13 @@ export function useDeleteLearnedRules() {
 }
 
 // ---------------------------------------------------------------------------
-// Categories (system + own)
-
-export function useCategories() {
-  return useQuery({
-    queryKey: queryKeys.categories,
-    staleTime: 10 * 60_000,
-    queryFn: async (): Promise<Category[]> => {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id, parent_id, name, slug, sort_order')
-        .order('sort_order');
-      if (error) throw error;
-      return (data ?? []) as Category[];
-    },
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Capture inbox
 
 export function useCapturedInbox() {
   const { session } = useAuth();
   const uid = session?.user.id;
   return useQuery({
-    queryKey: [...queryKeys.capturedInbox, uid],
+    queryKey: qk.inboxList(uid),
     enabled: !!uid,
     queryFn: async (): Promise<CapturedTxn[]> => {
       const { data, error } = await supabase
@@ -262,7 +234,7 @@ export function useCapturedHistory() {
   const { session } = useAuth();
   const uid = session?.user.id;
   return useQuery({
-    queryKey: [...queryKeys.capturedHistory, uid],
+    queryKey: qk.inboxHistory(uid),
     enabled: !!uid,
     staleTime: 5 * 60_000,
     queryFn: async (): Promise<HistoryTxn[]> => {
@@ -306,8 +278,9 @@ export function useConfirmCaptured() {
       return data as string;
     },
     onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ['captured_txns'] });
-      void qc.invalidateQueries({ queryKey: ['expenses'] });
+      // qk.inbox covers this list, the history and Home's inbox count.
+      void qc.invalidateQueries({ queryKey: qk.inbox });
+      void qc.invalidateQueries({ queryKey: qk.expenses });
     },
   });
 }
@@ -319,6 +292,6 @@ export function useDismissCaptured() {
       const { error } = await supabase.from('captured_txns').update({ status: 'not_mine' }).eq('id', id);
       if (error) throw error;
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ['captured_txns'] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.inbox }),
   });
 }

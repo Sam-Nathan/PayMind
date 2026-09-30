@@ -15,6 +15,7 @@ import {
 } from '../features/capture/data.ts';
 import { syncCaptureNow } from '../features/capture/useCapture.ts';
 import { Button, Card, Empty, Group, Overline, Screen, SettingRow, Toggle } from '../features/capture/ui';
+import { friendlyError } from '../data/errors.ts';
 import { supabase } from '../lib/supabase.ts';
 
 const hourOf = (t: string) => Number(t.slice(0, 2));
@@ -53,7 +54,7 @@ export default function PrivacyScreen() {
   const n = notifQ.data;
   const captureSupported = PaymindCapture.isSupported();
 
-  const fail = (e: unknown) => Alert.alert('Could not save', e instanceof Error ? e.message : 'Try again.');
+  const fail = (e: unknown) => Alert.alert('Could not save', friendlyError(e));
   const setPrivacy = (patch: Partial<PrivacySettings>) => update.mutate(patch, { onError: fail });
   const setNotif = (patch: Partial<NotificationPrefs>) => updateNotif.mutate(patch, { onError: fail });
 
@@ -414,7 +415,7 @@ function DeleteModal({ visible, onClose }: { visible: boolean; onClose: () => vo
       onClose();
       router.replace('/');
     } catch (e) {
-      Alert.alert('Could not delete your account', e instanceof Error ? e.message : 'Try again.');
+      Alert.alert('Could not delete your account', friendlyError(e));
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useMemo } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -40,13 +41,16 @@ export default function SpaceScreen() {
 
   const s = space.data;
   const active = (members.data ?? []).filter((m) => !m.leftAt);
-  const total = (expenses.data ?? []).reduce((a, e) => a + e.totalMinor, 0);
+  const rows = balances.data ?? [];
+  // Σ paid across members = every confirmed expense in the space. (The expenses list below is
+  // capped at 50 rows, so summing it under-counted busy spaces.)
+  const total = rows.reduce((a, b) => a + b.paidMinor, 0);
   const budget = s?.budgetMinor ?? null;
   const perPerson = active.length > 0 ? Math.round(total / active.length) : 0;
-  const rows = balances.data ?? [];
   const maxPaid = Math.max(1, ...rows.map((b) => b.paidMinor));
   const fairShare = rows.length > 0 ? total / rows.length : 0;
-  const memberName = (memberId: string | null) => members.data?.find((m) => m.id === memberId)?.displayName ?? 'Someone';
+  const names = useMemo(() => new Map((members.data ?? []).map((m) => [m.id, m.displayName])), [members.data]);
+  const memberName = (memberId: string | null) => (memberId ? names.get(memberId) : undefined) ?? 'Someone';
 
   if (space.isError) {
     return (

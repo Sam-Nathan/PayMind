@@ -105,7 +105,7 @@ export default async function HomePage() {
       <Container>
         {loadError ? (
           <p role="status" className="mt-4 rounded-[14px] bg-peach px-3.5 py-2.5 text-[14px] text-rust">
-            Some data could not be loaded right now. Pull to refresh or try again in a moment.
+            Some data could not be loaded right now. Try again in a moment.
           </p>
         ) : null}
 

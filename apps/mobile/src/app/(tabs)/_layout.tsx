@@ -1,7 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs, useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, View, type ColorValue, type PressableProps } from 'react-native';
 import { palette, type IconName } from '../../components/theme.ts';
+import { takePendingInvite } from '../../lib/pendingInvite.ts';
 
 const icon =
   (name: IconName, focusedName: IconName) =>
@@ -34,6 +36,19 @@ function ScanTabButton({ accessibilityLabel }: PressableProps) {
 }
 
 export default function TabsLayout() {
+  const router = useRouter();
+  // Resume an invite link that was opened before sign-in / onboarding (stashed by the root layout).
+  // The invite screen still asks for confirmation before joining.
+  useEffect(() => {
+    let cancelled = false;
+    void takePendingInvite().then((code) => {
+      if (code && !cancelled) router.push({ pathname: '/invite/[code]', params: { code } });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
   return (
     <Tabs
       screenOptions={{

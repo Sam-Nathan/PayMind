@@ -2,13 +2,15 @@ import '../../global.css';
 
 import { colors } from '@paymind/ui-tokens';
 import { useFonts } from 'expo-font';
+import { useLinkingURL } from 'expo-linking';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useNeedsOnboarding } from '../data/useProfile.ts';
 import { fontMap } from '../lib/fonts.ts';
+import { inviteCodeFromUrl, savePendingInvite } from '../lib/pendingInvite.ts';
 import { AppProviders } from '../providers/AppProviders.tsx';
 import { useAuth } from '../providers/AuthProvider.tsx';
 
@@ -21,6 +23,22 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 function Routes() {
   const { session, loading } = useAuth();
   const needsOnboarding = useNeedsOnboarding();
+  const url = useLinkingURL();
+  const ready = !!session && needsOnboarding === false;
+
+  // A signed-out (or not yet onboarded) user opening paymind://invite/CODE can't reach the invite
+  // screen yet: keep the code; (tabs)/_layout opens it after sign-in and onboarding.
+  // (A link already opened while signed in is not stashed again after a later sign-out.)
+  const seenWhileReady = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading) return;
+    if (ready) {
+      seenWhileReady.current = url;
+      return;
+    }
+    const code = url !== seenWhileReady.current ? inviteCodeFromUrl(url) : null;
+    if (code) void savePendingInvite(code);
+  }, [url, ready, loading]);
 
   if (loading || (session && needsOnboarding === undefined)) {
     return (

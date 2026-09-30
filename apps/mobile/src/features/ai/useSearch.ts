@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toMinor } from '../../data/mappers.ts';
+import { useAllMembers } from '../../data/settle.ts';
 import { supabase } from '../../lib/supabase.ts';
 import { useAuth } from '../../providers/AuthProvider.tsx';
 import { termPatterns, type SearchFilter } from './searchQuery.ts';
@@ -13,8 +14,24 @@ export interface SearchRow {
   id: string;
   title: string;
   totalMinor: number;
+  /** what this cost me: the total for a personal expense, my share(s) for a shared one */
+  myMinor: number;
   occurredAt: string;
   spaceId: string | null;
+}
+
+interface ShareCell {
+  member_id: string;
+  owed_minor: number | string;
+}
+
+/** Personal: the whole total. Shared: the sum of my own member rows' shares (0 if I'm not in it). */
+export function myCostOf(
+  r: { space_id: string | null; total_minor: number | string; mine?: ShareCell[] | null },
+  myMemberIds: ReadonlySet<string>,
+): number {
+  if (!r.space_id) return toMinor(r.total_minor);
+  return (r.mine ?? []).filter((m) => myMemberIds.has(m.member_id)).reduce((a, m) => a + toMinor(m.owed_minor), 0);
 }
 
 export interface Alias {
@@ -33,7 +50,6 @@ const searchKeys = {
   members: (uid: string | undefined, names: string) => ['ai', 'search-members', uid, names] as const,
   summary: (uid: string | undefined, plan: string) => ['ai', 'search-summary', uid, plan] as const,
   rows: (uid: string | undefined, plan: string) => ['ai', 'search-rows', uid, plan] as const,
-  people: (uid: string | undefined) => ['ai', 'search-people', uid] as const,
 };
 
 const localStart = (date: string) => {
@@ -43,18 +59,13 @@ const localStart = (date: string) => {
 
 /** Display names of everyone in the user's spaces, for recognising "Rahul" in a query. */
 export function usePeopleNames() {
-  const { session } = useAuth();
-  const uid = session?.user.id;
-  return useQuery({
-    queryKey: searchKeys.people(uid),
-    enabled: !!uid,
-    staleTime: 10 * 60_000,
-    queryFn: async (): Promise<string[]> => {
-      const { data, error } = await supabase.from('space_members').select('display_name').limit(500);
-      if (error) throw error;
-      return Array.from(new Set((data ?? []).map((r) => r.display_name).filter(Boolean)));
-    },
-  });
+  // Derived from the shared member list (same cache as Settle / Reminders / Pay), not a second fetch.
+  const members = useAllMembers();
+  const data = useMemo(
+    () => (members.data ? Array.from(new Set(members.data.map((m) => m.displayName).filter(Boolean))) : undefined),
+    [members.data],
+  );
+  return { ...members, data };
 }
 
 /** Merchants whose name or aliases (raw text or UPI id) match the search words. */
@@ -118,8 +129,11 @@ interface Plan {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function applyPlan(q: any, plan: Plan): any {
-  let out = q.neq('status', 'void');
+function applyPlan(q: any, plan: Plan, myMemberIds: readonly string[]): any {
+  // confirmed only: voided rows and unconfirmed AI drafts are not spending
+  let out = q.eq('status', 'confirmed');
+  // `mine` embeds only my own share rows (RLS lets me see everyone's in my spaces).
+  if (myMemberIds.length > 0) out = out.in('mine.member_id', myMemberIds);
   for (const f of plan.filters) {
     if (f.kind === 'min') out = out.gte('total_minor', f.minMinor);
     else if (f.kind === 'max') out = out.lte('total_minor', f.maxMinor);
@@ -136,9 +150,11 @@ function applyPlan(q: any, plan: Plan): any {
   return out;
 }
 
-const selectFor = (plan: Plan, cols: string) => (plan.memberIds ? `${cols}, expense_shares!inner(member_id)` : cols);
+const selectFor = (plan: Plan, cols: string) =>
+  `${cols}, mine:expense_shares(member_id, owed_minor)${plan.memberIds ? ', expense_shares!inner(member_id)' : ''}`;
 
 export interface SearchSummary {
+  /** Σ what the matches cost me (personal totals + my shares of shared ones) */
   totalMinor: number;
   count: number;
   averageMinor: number;
@@ -155,9 +171,13 @@ export function useExpenseSearch(term: string, filters: SearchFilter[], enabled:
   const merchants = useMerchantMatch(term);
   const personNames = filters.filter((f) => f.kind === 'person').map((f) => (f as { person: string }).person);
   const members = useMemberIds(personNames);
+  const allMembers = useAllMembers();
+  const myIds = (allMembers.data ?? []).filter((m) => m.userId === uid).map((m) => m.id).sort();
+  const mySet = new Set(myIds);
   const ready =
     enabled &&
     !!uid &&
+    !allMembers.isPending &&
     (termPatterns(term).length === 0 || !merchants.isPending) &&
     (personNames.length === 0 || !members.isPending);
   const noSuchPerson = personNames.length > 0 && members.isSuccess && members.data.length === 0;
@@ -168,7 +188,7 @@ export function useExpenseSearch(term: string, filters: SearchFilter[], enabled:
     filters,
     memberIds: personNames.length > 0 ? (members.data ?? []) : null,
   };
-  const planKey = JSON.stringify([plan.term, plan.merchantIds, plan.filters.map((f) => f.key), plan.memberIds]);
+  const planKey = JSON.stringify([plan.term, plan.merchantIds, plan.filters.map((f) => f.key), plan.memberIds, myIds]);
 
   const rows = useInfiniteQuery({
     queryKey: searchKeys.rows(uid, planKey),
@@ -176,7 +196,7 @@ export function useExpenseSearch(term: string, filters: SearchFilter[], enabled:
     initialPageParam: 0,
     queryFn: async ({ pageParam }): Promise<SearchRow[]> => {
       const base: any = supabase.from('expenses').select(selectFor(plan, 'id, title, total_minor, occurred_at, space_id'));
-      const { data, error } = await applyPlan(base, plan)
+      const { data, error } = await applyPlan(base, plan, myIds)
         .order('occurred_at', { ascending: false })
         .order('id', { ascending: false })
         .range(pageParam, pageParam + PAGE_SIZE - 1);
@@ -185,6 +205,7 @@ export function useExpenseSearch(term: string, filters: SearchFilter[], enabled:
         id: r.id,
         title: r.title,
         totalMinor: toMinor(r.total_minor),
+        myMinor: myCostOf(r, mySet),
         occurredAt: r.occurred_at,
         spaceId: r.space_id,
       }));
@@ -196,11 +217,11 @@ export function useExpenseSearch(term: string, filters: SearchFilter[], enabled:
     queryKey: searchKeys.summary(uid, planKey),
     enabled: ready && !noSuchPerson,
     queryFn: async (): Promise<SearchSummary> => {
-      const base: any = supabase.from('expenses').select(selectFor(plan, 'total_minor'));
-      const { data, error } = await applyPlan(base, plan).limit(SUMMARY_CAP);
+      const base: any = supabase.from('expenses').select(selectFor(plan, 'space_id, total_minor'));
+      const { data, error } = await applyPlan(base, plan, myIds).limit(SUMMARY_CAP);
       if (error) throw error;
-      const list = (data ?? []) as { total_minor: number | string }[];
-      const totalMinor = list.reduce((a, r) => a + toMinor(r.total_minor), 0);
+      const list = (data ?? []) as { space_id: string | null; total_minor: number | string; mine?: ShareCell[] | null }[];
+      const totalMinor = list.reduce((a, r) => a + myCostOf(r, mySet), 0);
       return {
         totalMinor,
         count: list.length,

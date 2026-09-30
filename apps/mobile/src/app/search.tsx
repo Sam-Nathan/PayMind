@@ -73,8 +73,8 @@ export default function SearchScreen() {
     if (!s) return;
     const lines = [
       `PayMind · ${heroLabel}`,
-      `Total ${fmtMoney(s.totalMinor, 0)} across ${s.count}${s.capped ? '+' : ''} expense${s.count === 1 ? '' : 's'}, about ${fmtMoney(s.averageMinor, 0)} each.`,
-      ...search.flat.slice(0, 10).map((r) => `${shortDate(toIsoDate(new Date(r.occurredAt)))} · ${r.title} · ${fmtMoney(r.totalMinor, 2)}`),
+      `Your share ${fmtMoney(s.totalMinor, 0)} across ${s.count}${s.capped ? '+' : ''} expense${s.count === 1 ? '' : 's'}, about ${fmtMoney(s.averageMinor, 0)} each.`,
+      ...search.flat.slice(0, 10).map((r) => `${shortDate(toIsoDate(new Date(r.occurredAt)))} · ${r.title} · ${fmtMoney(r.myMinor, 2)}${r.spaceId ? ` (your share of ${fmtMoney(r.totalMinor, 2)})` : ''}`),
     ];
     await Share.share({ message: lines.join('\n') }).catch(() => {});
   };
@@ -160,6 +160,7 @@ export default function SearchScreen() {
               <View className="mt-2 items-start">
                 <AmountText paise={s.totalMinor} variant="hero" tone="onDark" size={60} />
               </View>
+              <Text className="font-sans mt-1 text-[13px] text-paper/70">Your share · shared bills count only your part</Text>
               <Text className="font-sans mt-2 text-[15px] leading-[21px] text-paper/85">
                 {s.count === 0
                   ? 'Nothing matches. Try a wider date range.'
@@ -240,8 +241,15 @@ export default function SearchScreen() {
           ) : null
         }
         renderItem={({ item, index }) => (
-          <View
-            className={`min-h-[72px] flex-row items-center justify-between bg-white px-4 py-3 ${index === 0 ? 'rounded-t-[24px] border-t' : ''} border-x border-b border-hairline ${
+          <Pressable
+            onPress={() =>
+              item.spaceId
+                ? router.push({ pathname: '/space/[id]', params: { id: item.spaceId } })
+                : router.push('/timeline')
+            }
+            accessibilityRole="button"
+            accessibilityLabel={`${item.title}, ${fmtMoney(item.myMinor, 0)}. Open ${item.spaceId ? spaceName(item.spaceId) : 'timeline'}`}
+            className={`min-h-[72px] flex-row items-center justify-between bg-white px-4 py-3 active:opacity-80 ${index === 0 ? 'rounded-t-[24px] border-t' : ''} border-x border-b border-hairline ${
               index === search.flat.length - 1 ? 'rounded-b-[24px]' : ''
             }`}
           >
@@ -253,8 +261,13 @@ export default function SearchScreen() {
                 {`${shortDate(toIsoDate(new Date(item.occurredAt)))} · ${spaceName(item.spaceId)}`}
               </Text>
             </View>
-            <Text className="font-sans-bold text-[17px] text-ink">{fmtMoney(item.totalMinor, 0)}</Text>
-          </View>
+            <View className="items-end">
+              <Text className="font-sans-bold text-[17px] text-ink">{fmtMoney(item.myMinor, 0)}</Text>
+              {item.spaceId ? (
+                <Text className="font-sans text-[12px] text-muted">{`of ${fmtMoney(item.totalMinor, 0)}`}</Text>
+              ) : null}
+            </View>
+          </Pressable>
         )}
       />
     </View>

@@ -1,12 +1,17 @@
 import type { Metadata } from 'next';
-import { PagePlaceholder } from '../../components/PagePlaceholder';
+import { AuthForm } from '../../components/AuthForm';
 
 export const metadata: Metadata = { title: 'Sign in' };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
   return (
-    <main className="mx-auto max-w-md pt-24">
-      <PagePlaceholder title="Sign in">Phone OTP, Google, Apple — coming soon.</PagePlaceholder>
+    <main className="px-4 py-8 md:py-16">
+      <AuthForm mode="login" next={next} />
     </main>
   );
 }

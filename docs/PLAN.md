@@ -171,7 +171,7 @@ Reviews run at the end of **every milestone**, not only at the end of the projec
 | M6 | Account Aggregator, end-to-end tests, performance pass, Play Store internal testing track, TestFlight, web production | all reviewers |
 
 ## 9. Decisions needed
-1. A Supabase project: create a new one in Mumbai, or use an existing one?
+1. ~~Supabase project~~ Decided: existing project `PayMind` (ref `nlkoxgbrhpkqwuzobjas`, ap-south-1 Mumbai, Postgres 17, empty `public` schema).
 2. An Expo account (for EAS builds) and an Anthropic API key (for Edge Functions).
 3. Speech-to-text vendor for Hindi/Kannada.
 4. Whether Android auto-capture (notification reading) is in the first release, given the Play policy review it triggers.

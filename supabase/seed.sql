@@ -1,0 +1,4 @@
+-- PayMind seed (runs after migrations on `supabase db reset`).
+-- System categories live in migration 20260930000005_init_categories.sql, not here.
+-- Demo personas (Sunny, Rahul, Priya, Karthik, Ananya ...) need auth users, so they are
+-- created by a separate script that uses the Auth admin API, not by this file.

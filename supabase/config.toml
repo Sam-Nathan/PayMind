@@ -1,0 +1,13 @@
+# Supabase CLI config (local dev). Remote project: nlkoxgbrhpkqwuzobjas (ap-south-1, Postgres 17).
+project_id = "nlkoxgbrhpkqwuzobjas"
+
+[api]
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+
+[db]
+major_version = 17
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]

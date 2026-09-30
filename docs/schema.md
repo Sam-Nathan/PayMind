@@ -175,3 +175,12 @@ Errors are raised as `'<code>: detail'`. Match on the code prefix.
 ## Realtime
 
 The `supabase_realtime` publication includes `expenses`, `expense_shares`, `settlements` and `captured_txns`. RLS applies to what each subscriber receives.
+
+## Invites, pay links, receipts (migrations 06 and 08)
+
+- `space_invites(id, space_id, member_id, code, created_by, expires_at, accepted_by, accepted_at)`: members of the space can read; no direct writes. RPCs: `create_space_invite(p_space_id, p_member_id) -> text`, `preview_space_invite(p_code) -> jsonb`, `accept_space_invite(p_code) -> jsonb {space_id, member_id}`. Error codes (22023): `invite_not_found`, `invite_already_used`, `invite_expired`, `already_space_member`, `previously_left_space`, `member_not_available`, `member_already_linked`, `member_has_left`, `member_not_found`.
+- **Clients can no longer insert a `space_members` row for another real user**, and `create_space` rejects `members[].user_id` (`member_user_id_not_allowed`). Add placeholders, then invite.
+- `reminders.note_ref` added. `get_pay_link(p_token) -> jsonb | null` is the only function `anon` can call; it returns `{payee_name, payee_upi_vpa, amount_minor, note_ref, items: [{space_name, description, amount_minor}]}` for active reminders only.
+- Private Storage bucket `receipts` (objects under `<uid>/...`, owner-only RLS); written by `ai-parse-bill` only when `privacy_settings.keep_receipts` is on.
+- Future tables/functions no longer default-grant to `anon`/PUBLIC (`alter default privileges`).
+- `ai_proposals.kind` values written by Edge Functions: `bill_parse`, `expense_parse`, `create_expense` (assistant), `reminder` (assistant).

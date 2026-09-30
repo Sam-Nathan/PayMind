@@ -1,6 +1,6 @@
 'use server';
 
-import type { TablesUpdate } from '@paymind/db';
+import { deleteMyReceipts, type TablesUpdate } from '@paymind/db';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireUser } from '../../../lib/auth';
@@ -41,12 +41,14 @@ export async function deleteAccountAction(
   _prev: PrivacyState,
   formData: FormData,
 ): Promise<PrivacyState> {
-  await requireUser();
+  const user = await requireUser();
   if (String(formData.get('confirm') ?? '').trim() !== 'DELETE') {
     return { error: 'Type DELETE in capitals to confirm.' };
   }
   try {
     const supabase = await createClient();
+    // Receipt photos live in Storage, which the deletion trigger cannot reach: remove them first.
+    await deleteMyReceipts(supabase, user.id);
     const { error } = await supabase.rpc('delete_my_account');
     if (error) return { error: error.message };
     await supabase.auth.signOut();

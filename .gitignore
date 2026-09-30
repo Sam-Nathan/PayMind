@@ -10,6 +10,9 @@ out/
 web-build/
 android/
 ios/
+# ...but local Expo native modules keep their platform sources in android/ and ios/.
+!apps/mobile/modules/*/android/
+!apps/mobile/modules/*/ios/
 *.tsbuildinfo
 coverage/
 .env

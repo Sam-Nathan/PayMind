@@ -17,13 +17,14 @@ export async function resolvePayLink(token: string): Promise<ResolvedPayLink | n
     if (!row) return null;
 
     const amount = Number(row.amount_minor);
-    const vpa = String(row.upi_vpa ?? '');
+    // get_pay_link returns payee_upi_vpa / items[].space_name (migration 06).
+    const vpa = String(row.payee_upi_vpa ?? row.upi_vpa ?? '').trim();
     const name = String(row.payee_name ?? row.name ?? row.payee ?? '').trim();
     if (!Number.isSafeInteger(amount) || amount <= 0 || !name) return null;
 
     const rawItems = Array.isArray(row.items) ? (row.items as Record<string, unknown>[]) : [];
     const items = rawItems.map((i) => ({
-      space: String(i.space ?? ''),
+      space: String(i.space_name ?? i.space ?? ''),
       description: String(i.description ?? ''),
       amount_minor: Number(i.amount_minor) || 0,
     }));

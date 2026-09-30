@@ -16,6 +16,7 @@ import {
 import { syncCaptureNow } from '../features/capture/useCapture.ts';
 import { Button, Card, Empty, Group, Overline, Screen, SettingRow, Toggle } from '../features/capture/ui';
 import { friendlyError } from '../data/errors.ts';
+import { deleteMyReceipts } from '@paymind/db';
 import { supabase } from '../lib/supabase.ts';
 
 const hourOf = (t: string) => Number(t.slice(0, 2));
@@ -408,6 +409,9 @@ function DeleteModal({ visible, onClose }: { visible: boolean; onClose: () => vo
   const run = async () => {
     setBusy(true);
     try {
+      const { data: auth } = await supabase.auth.getUser();
+      // Receipt photos live in Storage, which the deletion trigger cannot reach: remove them first.
+      if (auth.user) await deleteMyReceipts(supabase, auth.user.id);
       const { error } = await supabase.rpc('delete_my_account');
       if (error) throw error;
       await PaymindCapture.setCaptureEnabled(false);

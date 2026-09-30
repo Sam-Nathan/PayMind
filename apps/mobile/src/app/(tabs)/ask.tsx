@@ -15,6 +15,7 @@ import { toPlainText } from '../../features/ai/text.ts';
 import { AiOffNote } from '../../features/ai/ui/chrome.tsx';
 import { ChatBubble, Composer, TypingDots } from '../../features/ai/ui/chat.tsx';
 import { ProposalView } from '../../features/ai/ui/ProposalView.tsx';
+import { useSpaces } from '../../data/useSpaces.ts';
 
 const SUGGESTIONS = ['Who owes me money?', 'Goa trip cost?', 'Why is spending up?', 'Subscriptions total'];
 const GREETING = 'Ask me about your money, or tell me an expense.';
@@ -32,7 +33,8 @@ const newId = () => `m${nextId++}`;
 export default function AskScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { q } = useLocalSearchParams<{ q?: string }>();
+  const { q, spaceId } = useLocalSearchParams<{ q?: string; spaceId?: string }>();
+  const spaces = useSpaces();
   const privacy = usePrivacySettings();
   const assistant = useAssistant();
   const scroll = useRef<ScrollView>(null);
@@ -69,14 +71,20 @@ export default function AskScreen() {
     [items, sending, disabled],
   );
 
-  // "Ask a follow-up" from Search arrives with ?q=...
+  // "Ask a follow-up" from Search arrives with ?q=...; "Ask this trip" also passes ?spaceId=...
+  // ai-assistant takes only `messages`, so the space is given as context in the question itself.
+  const spaceName = typeof spaceId === 'string' && spaceId ? spaces.data?.find((s) => s.id === spaceId)?.name : undefined;
+  const waitingForSpace = typeof spaceId === 'string' && !!spaceId && spaces.isPending;
   useEffect(() => {
-    const text = typeof q === 'string' ? q.trim() : '';
-    if (text && autoSent.current !== text && privacy.isSuccess) {
-      autoSent.current = text;
-      void send(text);
-    }
-  }, [q, privacy.isSuccess, send]);
+    const raw = typeof q === 'string' ? q.trim() : '';
+    if (!raw || !privacy.isSuccess || waitingForSpace) return;
+    const text =
+      spaceName && !raw.toLowerCase().includes(spaceName.toLowerCase()) ? `About my space "${spaceName}": ${raw}` : raw;
+    const key = `${spaceId ?? ''}|${raw}`;
+    if (autoSent.current === key) return;
+    autoSent.current = key;
+    void send(text);
+  }, [q, spaceId, spaceName, waitingForSpace, privacy.isSuccess, send]);
 
   const empty = items.length === 0;
 

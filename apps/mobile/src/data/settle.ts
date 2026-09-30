@@ -25,7 +25,8 @@ export const settleKeys = {
   list: (uid: string | undefined) => ['settlements', 'list', uid] as const,
   one: (id: string | undefined) => ['settlements', 'one', id] as const,
   members: ['space-members', 'all'] as const,
-  ious: (spaceIds: string) => ['settlements', 'ious', spaceIds] as const,
+  /** derived from expenses, so it lives under that prefix (create expense / Realtime refresh it) */
+  ious: (spaceIds: string) => ['expenses', 'ious', spaceIds] as const,
 };
 
 export interface Settlement {
@@ -141,7 +142,8 @@ export function useAllMembers() {
     queryFn: async (): Promise<MemberInfo[]> => {
       const { data, error } = await supabase
         .from('space_members')
-        .select('id, space_id, user_id, display_name, upi_vpa, left_at');
+        .select('id, space_id, user_id, display_name, upi_vpa, left_at')
+        .limit(2000);
       if (error) throw error;
       return (data ?? []).map((r) => ({
         id: r.id,
@@ -151,6 +153,24 @@ export function useAllMembers() {
         upiVpa: r.upi_vpa,
         leftAt: r.left_at,
       }));
+    },
+  });
+}
+
+/** Member ids that owe a share of one expense (for "Send reminder" right after adding a bill). */
+export function useExpenseShareMembers(expenseId: string | undefined) {
+  return useQuery({
+    queryKey: ['expenses', 'share-members', expenseId] as const,
+    enabled: !!expenseId,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from('expense_shares')
+        .select('member_id, owed_minor')
+        .eq('expense_id', expenseId as string)
+        .gt('owed_minor', 0)
+        .limit(200);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.member_id);
     },
   });
 }
@@ -343,18 +363,16 @@ export function useSendReminder() {
     mutationFn: async (a: SendReminderArgs): Promise<SendReminderResult> => {
       const { data, error } = await supabase.functions.invoke('send-reminder', { body: a });
       if (error) {
-        // FunctionsHttpError carries the response; its JSON body has { error, message }.
+        // FunctionsHttpError carries the response; the body is the envelope { error: { code, message } }.
         const ctx = (error as { context?: Response }).context;
-        if (ctx && typeof ctx.json === 'function') {
-          try {
-            const body = (await ctx.json()) as { error?: string; message?: string };
-            if (body.error === 'nothing_owed') throw new Error('They do not owe you anything right now.');
-            if (body.error === 'cannot_remind_self') throw new Error("You can't send a reminder to yourself.");
-            if (body.message) throw new Error(body.message);
-          } catch (e) {
-            if (e instanceof Error && e.name !== 'SyntaxError') throw e;
-          }
-        }
+        type ErrorBody = { error?: { code?: string; message?: string } | string; message?: string };
+        const body: ErrorBody | null =
+          ctx && typeof ctx.json === 'function' ? await ctx.json().then((j: unknown) => j as ErrorBody, () => null) : null;
+        const code = typeof body?.error === 'string' ? body.error : body?.error?.code;
+        const message = typeof body?.error === 'object' ? body.error?.message : body?.message;
+        if (code === 'nothing_owed') throw new Error('They do not owe you anything right now.');
+        if (code === 'cannot_remind_self') throw new Error("You can't send a reminder to yourself.");
+        if (message) throw new Error(message);
         throw error;
       }
       return data as SendReminderResult;

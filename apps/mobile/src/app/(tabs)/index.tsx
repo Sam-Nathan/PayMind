@@ -1,4 +1,4 @@
-import { perDayDisplayRupees, safeToSpend } from '@paymind/core';
+import { PAISE_PER_RUPEE } from '@paymind/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -25,7 +25,8 @@ import {
   TextField,
   fmtMoney,
 } from '../../components/index.ts';
-import { dayAndMonth, daysLeftInMonth, monthEndIso, monthShort } from '../../data/dates.ts';
+import { dayAndMonth, monthShort } from '../../data/dates.ts';
+import { useSafeToSpend } from '../../data/money.ts';
 import { friendlyError } from '../../data/errors.ts';
 import { useMyNetBalances } from '../../data/useBalances.ts';
 import { useMonthSpend, useMonthlyBudget } from '../../data/useExpenses.ts';
@@ -35,7 +36,6 @@ import {
   useInboxCount,
   useLatestInsight,
   useManualBalance,
-  useRecurringDueBefore,
   useSetManualBalance,
   useUpcomingRecurring,
 } from '../../data/useHome.ts';
@@ -59,7 +59,6 @@ export default function HomeScreen() {
   const spend = useMonthSpend(now);
   const budget = useMonthlyBudget();
   const upcoming = useUpcomingRecurring(3);
-  const due = useRecurringDueBefore(monthEndIso(now));
   const inbox = useInboxCount();
   const goal = useActiveGoal();
   const insight = useLatestInsight();
@@ -71,17 +70,11 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const daysLeft = daysLeftInMonth(now);
-  const sts = manual.data
-    ? safeToSpend({
-        balanceMinor: manual.data.balanceMinor,
-        upcomingMinor: due.data ?? 0,
-        goalSetAsideMinor: 0,
-        bufferMinor: manual.data.bufferMinor,
-        daysLeft,
-      })
-    : null;
-  const perDayPaise = sts ? perDayDisplayRupees(sts.perDayMinor) * 100 : null;
+  // Same computation as the Money tab (balance − bills due − goal set-aside − buffer), so both
+  // screens always show the same number.
+  const safe = useSafeToSpend(now);
+  const daysLeft = safe.daysLeft;
+  const perDayPaise = safe.perDayRupees !== null ? safe.perDayRupees * PAISE_PER_RUPEE : null;
 
   const n = net.data;
   const spaceName = (id: string | undefined) => spaces.data?.find((s) => s.space.id === id)?.space.name;

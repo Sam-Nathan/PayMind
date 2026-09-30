@@ -31,6 +31,8 @@ export function useRealtimeSync() {
       money = setTimeout(() => {
         void qc.invalidateQueries({ queryKey: qk.expenses });
         void qc.invalidateQueries({ queryKey: qk.balances });
+        // settle history / verify status (settleKeys in ./settle.ts)
+        void qc.invalidateQueries({ queryKey: ['settlements'] });
       }, 250);
     };
     const onInboxChange = () => {

@@ -16,7 +16,14 @@ import {
 } from '../components/index.ts';
 import { relativeDay } from '../data/dates.ts';
 import { friendlyError } from '../data/errors.ts';
-import { useAllMembers, useSendReminder, useSettlePlan, useSettlements, type Settlement } from '../data/settle.ts';
+import {
+  useAllMembers,
+  useExpenseShareMembers,
+  useSendReminder,
+  useSettlePlan,
+  useSettlements,
+  type Settlement,
+} from '../data/settle.ts';
 import { useSpaces } from '../data/useSpaces.ts';
 import {
   REPEAT_OPTIONS,
@@ -32,7 +39,11 @@ import { useAuth } from '../providers/AuthProvider.tsx';
 
 export default function RemindersScreen() {
   const router = useRouter();
-  const { person: personParam } = useLocalSearchParams<{ person?: string }>();
+  const {
+    person: personParam,
+    spaceId: spaceParam,
+    expenseId: expenseParam,
+  } = useLocalSearchParams<{ person?: string; spaceId?: string; expenseId?: string }>();
   const { session } = useAuth();
   const uid = session?.user.id;
   const { plan, isPending, isError, error, refetch } = useSettlePlan();
@@ -40,6 +51,7 @@ export default function RemindersScreen() {
   const spaces = useSpaces();
   const history = useSettlements();
   const send = useSendReminder();
+  const shareMembers = useExpenseShareMembers(expenseParam || undefined);
 
   const [picked, setPicked] = useState<string | null>(personParam ?? null);
   const [tone, setTone] = useState<ReminderTone>('friendly');
@@ -47,7 +59,21 @@ export default function RemindersScreen() {
   const [sent, setSent] = useState<{ message: string; pushed: number } | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
 
-  const gets = plan?.gets ?? [];
+  // Hand-off from split/[id] ("Send reminder" after adding a bill): the people who owe me in that
+  // space, preferring those with a share of that expense, are listed first and the first is picked.
+  const relevant = useMemo(() => {
+    const out = new Set<string>();
+    if (!spaceParam || !plan) return out;
+    const sharers = new Set(shareMembers.data ?? []);
+    const inSpace = plan.gets.filter((g) => g.items.some((i) => i.spaceId === spaceParam));
+    const fromBill = inSpace.filter((g) => g.items.some((i) => i.spaceId === spaceParam && sharers.has(i.fromMember)));
+    for (const g of fromBill.length > 0 ? fromBill : inSpace) out.add(g.key);
+    return out;
+  }, [spaceParam, plan, shareMembers.data]);
+  const gets = useMemo(() => {
+    const all = plan?.gets ?? [];
+    return relevant.size === 0 ? all : [...all.filter((g) => relevant.has(g.key)), ...all.filter((g) => !relevant.has(g.key))];
+  }, [plan, relevant]);
   const person = gets.find((g) => g.key === picked) ?? gets[0];
 
   // A different person/tone makes the returned message stale.
@@ -87,6 +113,15 @@ export default function RemindersScreen() {
     <FlowScreen title="Reminders & history" onBack={() => router.back()}>
       <Card radius={28} padding={16}>
         <Text className="font-sans-bold text-[19px] text-ink">Nudge someone</Text>
+        {relevant.size > 0 ? (
+          <Text className="font-sans mt-1 text-[14px] text-muted">
+            Owe you in {spaceName(spaceParam as string)}:{' '}
+            {gets
+              .filter((g) => relevant.has(g.key))
+              .map((g) => firstName(g.name))
+              .join(', ')}
+          </Text>
+        ) : null}
 
         {isPending ? (
           <View className="mt-3">

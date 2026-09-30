@@ -22,9 +22,9 @@ export const IsoDateTimeSchema = z.iso.datetime({ offset: true, local: true });
 export const CurrencySchema = z.literal('INR');
 
 export const SpaceTypeSchema = z.enum(['trip', 'event', 'couple', 'family', 'roommates', 'friends', 'college', 'office', 'custom']);
-export const ExpenseSourceSchema = z.enum(['scan', 'voice', 'text', 'upi_alert', 'sms', 'ebill', 'manual']);
+export const ExpenseSourceSchema = z.enum(['scan', 'voice', 'text', 'upi_alert', 'sms', 'ebill', 'manual', 'recurring', 'assistant']);
 export const VisibilitySchema = z.enum(['personal', 'shared']);
-export const PaidViaSchema = z.enum(['upi', 'cash', 'card', 'bank_transfer', 'wallet', 'other']);
+export const PaidViaSchema = z.enum(['upi', 'cash', 'card', 'bank', 'wallet', 'other']);
 export const ItemKindSchema = z.enum(['item', 'discount', 'service', 'tax', 'tip']);
 export const SplitMethodSchema = z.enum(['equal', 'ratio', 'by_room', 'by_usage', 'by_item', 'fixed']);
 export const SettlementStatusSchema = z.enum(['initiated', 'pending', 'completed', 'failed', 'confirmed_manual', 'corrected', 'cancelled']);

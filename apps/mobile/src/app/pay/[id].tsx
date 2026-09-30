@@ -27,6 +27,7 @@ import {
   useSettlement,
 } from '../../data/settle.ts';
 import { useSpaces } from '../../data/useSpaces.ts';
+import { useAuth } from '../../providers/AuthProvider.tsx';
 import { getInstalledUpiApps, payWithUpi } from '../../features/upi/index.ts';
 import { ManualSheet } from '../../features/settle/ManualSheet.tsx';
 import {
@@ -65,6 +66,30 @@ export default function PayScreen() {
     }
     return decodeDraft(itemsParam);
   }, [existingId, existing.data, spaces.data, itemsParam]);
+
+  // `items` can arrive in a deep link, so it is checked against my own member rows: every line must
+  // be paid by me and go to the same person (the UPI ID and total are for one payee).
+  const { session } = useAuth();
+  const uid = session?.user.id;
+  const itemsProblem = useMemo(() => {
+    if (existingId || items.length === 0 || !members.data) return false;
+    const byId = new Map(members.data.map((m) => [m.id, m]));
+    const payee = byId.get(items[0]?.toMember as string);
+    if (!payee) return true;
+    const payeeKey = personKey(payee.userId, payee.displayName);
+    return items.some((it) => {
+      const from = byId.get(it.fromMember);
+      const to = byId.get(it.toMember);
+      return (
+        !from ||
+        !to ||
+        from.userId !== uid ||
+        from.spaceId !== it.spaceId ||
+        to.spaceId !== it.spaceId ||
+        personKey(to.userId, to.displayName) !== payeeKey
+      );
+    });
+  }, [existingId, items, members.data, uid]);
 
   const total = sumItems(items);
   const payeeRow = members.data?.find((m) => m.id === items[0]?.toMember);
@@ -114,7 +139,7 @@ export default function PayScreen() {
   const alreadyDone = !!status && status !== 'initiated' && status !== 'failed' && status !== 'pending';
 
   const onContinue = async () => {
-    if (!selected || !vpa) return;
+    if (!selected || !vpa || itemsProblem) return;
     setError(null);
     setBusy(true);
     try {
@@ -220,7 +245,7 @@ export default function PayScreen() {
         <View className="gap-3 px-4 pt-4">
           {loading ? (
             <Skeleton height={150} radius={24} />
-          ) : items.length === 0 || (existingId && !existing.data) ? (
+          ) : items.length === 0 || itemsProblem || (existingId && !existing.data) ? (
             <ErrorNote message="We couldn't find that payment. Go back to Settle up and try again." />
           ) : alreadyDone ? (
             <Card>

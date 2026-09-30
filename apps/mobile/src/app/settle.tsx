@@ -59,6 +59,16 @@ export default function SettleScreen() {
     return out;
   }, [settlements.data, memberName, uid]);
 
+  // My UPI payments that haven't been confirmed yet. They don't count toward balances, so the
+  // same person still shows under "You pay": surface them so nobody pays twice.
+  const inFlight = useMemo(
+    () =>
+      (settlements.data ?? []).filter(
+        (s) => (s.status === 'initiated' || s.status === 'pending') && memberName.get(s.fromMember)?.userId === uid,
+      ),
+    [settlements.data, memberName, uid],
+  );
+
   const pay = (p: PersonPlan) =>
     router.push({ pathname: '/pay/[id]', params: { id: 'draft', items: encodeDraft(p.items) } });
 
@@ -129,6 +139,28 @@ export default function SettleScreen() {
               meta={`${plural(plan.gets.length, 'person', 'people')} · ${plural(plan.spacesOwedCount, 'space')}`}
             />
           </View>
+
+          {inFlight.length > 0 ? (
+            <Card tone="sand" radius={24} padding={16}>
+              <Text className="font-sans-bold text-[16px] text-ink">Waiting for confirmation</Text>
+              <Text className="font-sans mt-0.5 text-[13px] text-muted">
+                Check these in your UPI app before paying again.
+              </Text>
+              {inFlight.slice(0, 5).map((s) => (
+                <Pressable
+                  key={s.id}
+                  onPress={() => router.push({ pathname: '/verify/[id]', params: { id: s.id } })}
+                  accessibilityRole="button"
+                  className="mt-3 flex-row items-center justify-between active:opacity-80"
+                >
+                  <Text className="font-sans-semibold flex-1 pr-3 text-[15px] text-ink" numberOfLines={1}>
+                    To {memberName.get(s.toMember)?.displayName ?? 'someone'} · {shortDate(s.createdAt)}
+                  </Text>
+                  <Text className="font-sans-semibold text-[15px] text-signal">{fmtMoney(s.amountMinor)} · Check</Text>
+                </Pressable>
+              ))}
+            </Card>
+          ) : null}
 
           {allSquare ? (
             <Card>

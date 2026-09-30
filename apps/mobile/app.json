@@ -34,15 +34,15 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "PayMind uses the camera to read bills you scan.",
-          "photosPermission": "PayMind reads bill photos you choose to upload."
+          "cameraPermission": "PayMind uses the camera only when you scan a bill, so it can read the items and total for you.",
+          "photosPermission": "PayMind reads only the bill photos you choose, to fill in the items and total for you."
         }
       ],
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "PayMind uses the microphone so you can say an expense.",
-          "speechRecognitionPermission": "PayMind uses speech recognition to turn what you say into an expense."
+          "microphonePermission": "PayMind uses the microphone only while you are recording, so you can say an expense instead of typing it.",
+          "speechRecognitionPermission": "PayMind turns what you say into text so it can fill in the expense. Nothing is recorded in the background."
         }
       ],
       [

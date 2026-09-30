@@ -1,3 +1,4 @@
+import { paiseToRupeeString } from '@paymind/core';
 /**
  * Presentational pieces for the money screens that don't exist in src/components (components.md:
  * BudgetRow, ForecastChart, InsightNoteCard, ScenarioToggleCard, TypeBadge, Switch row) plus the
@@ -341,8 +342,8 @@ export function BalanceSheet({
   initialBuffer: number | undefined;
 }) {
   const set = useSetManualBalance();
-  const [balance, setBalance] = useState(initialBalance !== undefined ? String(initialBalance / 100) : '');
-  const [buffer, setBuffer] = useState(String((initialBuffer ?? DEFAULT_BUFFER_MINOR) / 100));
+  const [balance, setBalance] = useState(initialBalance !== undefined ? paiseToRupeeString(initialBalance).replace(/\.00$/, '') : '');
+  const [buffer, setBuffer] = useState(paiseToRupeeString(initialBuffer ?? DEFAULT_BUFFER_MINOR).replace(/\.00$/, ''));
   const [error, setError] = useState<string | null>(null);
 
   const save = async () => {

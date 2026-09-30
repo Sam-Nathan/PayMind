@@ -1,3 +1,4 @@
+import { paiseToRupeeString } from '@paymind/core';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
@@ -64,7 +65,7 @@ export default function AffordScreen() {
   const purchase = amountText.trim() === '0' || amountText.trim() === '' ? 0 : (parseAmountInput(amountText) ?? 0);
   const setAmount = (minor: number) => {
     setPreset(null);
-    setAmountText(String(Math.round(minor) / 100));
+    setAmountText(paiseToRupeeString(Math.round(minor)).replace(/\.00$/, ''));
   };
 
   const data = useMemo(() => lines.data ?? [], [lines.data]);
@@ -126,7 +127,7 @@ export default function AffordScreen() {
                 selected={preset === p.id}
                 onPress={() => {
                   setPreset(p.id);
-                  setAmountText(String(p.minor / 100));
+                  setAmountText(paiseToRupeeString(p.minor).replace(/\.00$/, ''));
                   setPeriod(p.period);
                 }}
               />

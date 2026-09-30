@@ -1,3 +1,4 @@
+import { PAISE_PER_RUPEE } from '@paymind/core';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
@@ -158,7 +159,7 @@ export default function MoneyScreen() {
             ) : sts.ready && sts.result ? (
               <>
                 <View className="mt-2 flex-row items-end">
-                  <AmountText paise={sts.perDayRupees! * 100} variant="hero" tone="onDark" size={66} unit="a day" />
+                  <AmountText paise={sts.perDayRupees! * PAISE_PER_RUPEE} variant="hero" tone="onDark" size={66} unit="a day" />
                 </View>
                 <View className="mt-3 gap-2">
                   <Row

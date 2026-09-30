@@ -1,3 +1,4 @@
+import { paiseToRupeeString } from '@paymind/core';
 import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Button, Chip, ChipGroup, Sheet, TextField } from '../../../components/index.ts';
@@ -29,7 +30,7 @@ export function ItemEditorSheet({
     if (!visible) return;
     setName(item?.name ?? '');
     setQty(item ? String(item.qty) : '1');
-    setAmount(item ? (item.amountMinor / 100).toFixed(2) : '');
+    setAmount(item ? paiseToRupeeString(item.amountMinor) : '');
     setError(null);
   }, [visible, item]);
 

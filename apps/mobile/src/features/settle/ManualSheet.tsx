@@ -1,4 +1,4 @@
-import { formatINR } from '@paymind/core';
+import { formatINR, paiseToRupeeString } from '@paymind/core';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button, Chip, ChipGroup, ErrorNote, Sheet, TextField } from '../../components/index.ts';
@@ -37,7 +37,7 @@ export function ManualSheet({
   useEffect(() => {
     if (personKeyNow !== undefined && owedNow !== undefined) {
       setMethod(initialMethod);
-      setAmount((owedNow / 100).toFixed(2).replace(/\.00$/, ''));
+      setAmount(paiseToRupeeString(owedNow).replace(/\.00$/, ''));
       setNote('');
       setError(null);
     }

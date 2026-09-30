@@ -1,3 +1,4 @@
+import { paiseToRupeeString } from '@paymind/core';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -363,7 +364,7 @@ export default function VoiceScreen() {
         title="Amount"
         label="Rupees"
         kind="rupees"
-        initial={draft?.amountMinor ? (draft.amountMinor / 100).toFixed(2) : ''}
+        initial={draft?.amountMinor ? paiseToRupeeString(draft.amountMinor) : ''}
         onClose={() => setSheet(null)}
         onSave={(_v, minor) => {
           patch({ amountMinor: minor });

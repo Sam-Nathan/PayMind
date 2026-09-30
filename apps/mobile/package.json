@@ -7,7 +7,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@expo-google-fonts/doto": "^0.4.1",
@@ -38,6 +39,7 @@
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.10.1"
   },
@@ -45,6 +47,7 @@
     "@types/aes-js": "^3.1.4",
     "@types/react": "~19.2.2",
     "tailwindcss": "^3.4.19",
-    "typescript": "~5.9.0"
+    "typescript": "~5.9.0",
+    "vitest": "^5.0.2"
   }
 }

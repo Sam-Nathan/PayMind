@@ -41,11 +41,37 @@ export function serveJson(handler: (req: Request) => Promise<Response>): (req: R
   };
 }
 
-export async function readJson(req: Request, maxBytes = 15_000_000): Promise<unknown> {
+/**
+ * Reads a JSON body of at most `maxBytes`. The limit is enforced on the bytes actually streamed,
+ * not only on Content-Length (a chunked request has none). Pick a per-function limit.
+ */
+export async function readJson(req: Request, maxBytes = 64_000): Promise<unknown> {
+  const tooLarge = () => new HttpError(413, 'payload_too_large', 'Request body is too large');
   const len = Number(req.headers.get('content-length') ?? 0);
-  if (len > maxBytes) throw new HttpError(413, 'payload_too_large', 'Request body is too large');
+  if (len > maxBytes) throw tooLarge();
+  if (!req.body) throw new HttpError(400, 'invalid_json', 'Body must be valid JSON');
+
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => {});
+      throw tooLarge();
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) {
+    bytes.set(c, off);
+    off += c.byteLength;
+  }
   try {
-    return await req.json();
+    return JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     throw new HttpError(400, 'invalid_json', 'Body must be valid JSON');
   }

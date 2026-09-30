@@ -1,6 +1,6 @@
 import { z } from 'npm:zod@4';
 import { getProvider, LlmError, type ChatMessage } from '../_shared/ai/index.ts';
-import { requireAiEnabled, requireUser } from '../_shared/auth.ts';
+import { enforceRateLimit, requireAiEnabled, requireUser } from '../_shared/auth.ts';
 import { HttpError, json, readJson, serveJson } from '../_shared/http.ts';
 import { runTool, TOOL_DEFS, type ProposalOut } from './tools.ts';
 
@@ -17,7 +17,9 @@ const MAX_TOOL_RESULT_CHARS = 6000;
 Deno.serve(
   serveJson(async (req) => {
     const ctx = await requireUser(req);
-    const parsed = BodySchema.safeParse(await readJson(req));
+    // Each request can make up to MAX_ITERATIONS model calls.
+    await enforceRateLimit(ctx, 'ai-assistant', 60);
+    const parsed = BodySchema.safeParse(await readJson(req, 200_000));
     if (!parsed.success) throw new HttpError(400, 'invalid_request', parsed.error.issues.map((i) => i.message).join('; '));
     if (parsed.data.messages[parsed.data.messages.length - 1].role !== 'user') {
       throw new HttpError(400, 'invalid_request', 'The last message must be from the user');

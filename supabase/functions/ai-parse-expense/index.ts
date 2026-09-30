@@ -1,6 +1,6 @@
 import { z } from 'npm:zod@4';
 import { getProvider, LlmError } from '../_shared/ai/index.ts';
-import { requireAiEnabled, requireUser, saveProposal } from '../_shared/auth.ts';
+import { enforceRateLimit, requireAiEnabled, requireUser, saveProposal } from '../_shared/auth.ts';
 import { HttpError, json, readJson, serveJson } from '../_shared/http.ts';
 import { ExpenseParseResultSchema } from '../_shared/schemas.ts';
 
@@ -30,7 +30,8 @@ function istToday(): string {
 Deno.serve(
   serveJson(async (req) => {
     const ctx = await requireUser(req);
-    const parsed = BodySchema.safeParse(await readJson(req));
+    await enforceRateLimit(ctx, 'ai-parse-expense', 60);
+    const parsed = BodySchema.safeParse(await readJson(req, 16_000));
     if (!parsed.success) throw new HttpError(400, 'invalid_request', parsed.error.issues.map((i) => i.message).join('; '));
     const { text, locale, source } = parsed.data;
     const today = parsed.data.today ?? istToday();

@@ -56,6 +56,31 @@ export async function requireAiEnabled(ctx: AuthedContext): Promise<PrivacyFlags
   return p;
 }
 
+/**
+ * Per-user fixed-window rate limit (migration 09: public.consume_rate_limit). Throws 429 when the
+ * caller is over `limit` calls per `windowSeconds` for `bucket`. Fails open if the counter itself
+ * is unavailable (e.g. the migration is not applied yet), so an outage there never blocks users.
+ */
+export async function enforceRateLimit(
+  ctx: AuthedContext,
+  bucket: string,
+  limit: number,
+  windowSeconds = 3600,
+): Promise<void> {
+  const { data, error } = await ctx.supabase.rpc('consume_rate_limit', {
+    p_bucket: bucket,
+    p_limit: limit,
+    p_window_seconds: windowSeconds,
+  });
+  if (error) {
+    console.error('rate limit check failed (allowing request)', bucket, error.message);
+    return;
+  }
+  if (data === false) {
+    throw new HttpError(429, 'rate_limited', 'You are doing that too often. Please wait a little and try again.');
+  }
+}
+
 /** Stores an AI proposal (RLS: the caller's own row). Returns its id. */
 export async function saveProposal(
   ctx: AuthedContext,

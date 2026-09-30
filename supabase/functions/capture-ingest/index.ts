@@ -1,5 +1,5 @@
 import { z } from 'npm:zod@4';
-import { getPrivacy, requireUser } from '../_shared/auth.ts';
+import { enforceRateLimit, getPrivacy, requireUser } from '../_shared/auth.ts';
 import { HttpError, json, readJson, serveJson } from '../_shared/http.ts';
 
 // Parsing happens on-device (packages/core). Only these minimal fields are accepted;
@@ -41,7 +41,8 @@ function ruleMatches(rule: Rule, t: { payee: string | null; vpa: string | null }
 Deno.serve(
   serveJson(async (req) => {
     const ctx = await requireUser(req);
-    const body = BodySchema.safeParse(await readJson(req, 1_000_000));
+    await enforceRateLimit(ctx, 'capture-ingest', 120);
+    const body = BodySchema.safeParse(await readJson(req, 256_000));
     if (!body.success) throw new HttpError(400, 'invalid_request', 'Send {items: [...]} with 1 to 50 items');
     const privacy = await getPrivacy(ctx);
     if (!privacy.capture_notifications) {
@@ -131,8 +132,8 @@ Deno.serve(
     let history: { payee: string | null; vpa: string | null; amount_minor: number; occurred_at: string }[] = [];
     if (payees.length || vpaSet.length) {
       const ors = [
-        ...(payees.length ? [`payee.in.(${payees.map((p) => `"${p.replace(/"/g, '')}"`).join(',')})`] : []),
-        ...(vpaSet.length ? [`vpa.in.(${vpaSet.map((v) => `"${v.replace(/"/g, '')}"`).join(',')})`] : []),
+        ...(payees.length ? [`payee.in.(${payees.map((p) => `"${p.replace(/["\\]/g, '')}"`).join(',')})`] : []),
+        ...(vpaSet.length ? [`vpa.in.(${vpaSet.map((v) => `"${v.replace(/["\\]/g, '')}"`).join(',')})`] : []),
       ].join(',');
       const { data } = await ctx.supabase
         .from('captured_txns')

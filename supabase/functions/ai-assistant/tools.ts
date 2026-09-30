@@ -58,6 +58,12 @@ export interface ProposalOut {
   payload: unknown;
 }
 
+/** Tool results go to the model (and can surface in its reply): never pass raw database errors. */
+function lookupFailed(tool: string, detail: string) {
+  console.error('tool lookup failed', tool, detail);
+  return { error: 'Could not load that data right now' };
+}
+
 function monthBounds(now = new Date()) {
   const ist = new Date(now.getTime() + 5.5 * 3600_000);
   const y = ist.getUTCFullYear();
@@ -85,7 +91,7 @@ export async function runTool(
       let q = db.from('balances').select('space_id, member_id, user_id, display_name, net_minor, paid_minor, owed_minor').is('left_at', null);
       if (a.spaceId) q = q.eq('space_id', a.spaceId);
       const [{ data, error }, { data: spaces }] = await Promise.all([q, db.from('spaces').select('id, name')]);
-      if (error) return { error: error.message };
+      if (error) return lookupFailed(name, error.message);
       const names = new Map((spaces ?? []).map((s) => [s.id, s.name]));
       const bySpace = new Map<string, any>();
       for (const r of data ?? []) {
@@ -111,13 +117,13 @@ export async function runTool(
       if (a.minAmountMinor != null) q = q.gte('total_minor', a.minAmountMinor);
       if (a.maxAmountMinor != null) q = q.lte('total_minor', a.maxAmountMinor);
       const { data, error } = await q;
-      if (error) return { error: error.message };
+      if (error) return lookupFailed(name, error.message);
       const total = (data ?? []).reduce((s, e) => s + e.total_minor, 0);
       return { count: data?.length ?? 0, totalMinor: total, expenses: data ?? [] };
     }
     case 'get_budget_status': {
       const { data: budgets, error } = await db.from('budgets').select('id, owner_id, space_id, scope, period, name, category_id, limit_minor, starts_on, ends_on');
-      if (error) return { error: error.message };
+      if (error) return lookupFailed(name, error.message);
       const month = monthBounds();
       const out = [];
       for (const b of budgets ?? []) {

@@ -1,5 +1,5 @@
 import { z } from 'npm:zod@4';
-import { adminClient, requireUser } from '../_shared/auth.ts';
+import { adminClient, enforceRateLimit, requireUser } from '../_shared/auth.ts';
 import { rupees } from '../_shared/detective.ts';
 import { HttpError, json, readJson, serveJson } from '../_shared/http.ts';
 
@@ -48,6 +48,8 @@ function randomToken(): string {
 Deno.serve(
   serveJson(async (req) => {
     const ctx = await requireUser(req);
+    // Each reminder can push to other people's phones: keep it well below spam levels.
+    await enforceRateLimit(ctx, 'send-reminder', 20);
     const parsed = BodySchema.safeParse(await readJson(req, 100_000));
     if (!parsed.success) throw new HttpError(400, 'invalid_request', parsed.error.issues.map((i) => i.message).join('; '));
     const { tone, repeat } = parsed.data;

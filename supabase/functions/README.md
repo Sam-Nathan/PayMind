@@ -8,7 +8,11 @@ Base URL: `https://nlkoxgbrhpkqwuzobjas.supabase.co/functions/v1/<name>`. With s
 
 Errors always look like `{ "error": { "code": "...", "message": "human readable", "details"?: ... } }`.
 Common codes: `401 not_authenticated`, `403 ai_disabled` (Privacy: AI off), `400 invalid_request`,
-`413 payload_too_large`, `502 ai_unavailable | ai_bad_output`.
+`413 payload_too_large`, `429 rate_limited`, `502 ai_unavailable | ai_bad_output`.
+
+**Rate limits (per user, per hour; `consume_rate_limit`, migration 09):** `ai-parse-bill` 30, `ai-parse-expense` 60,
+`ai-assistant` 60, `capture-ingest` 120, `send-reminder` 20. Body caps: `ai-parse-bill` 15 MB, `capture-ingest` 256 KB,
+`ai-assistant` 200 KB, `send-reminder` 100 KB, `ai-parse-expense` 16 KB (enforced on the streamed bytes, not only Content-Length).
 
 All money is integer paise (`...Minor`). AI outputs are validated with the zod schemas in
 `packages/core/src/schemas.ts` (vendored to `_shared/schemas.ts`, see "Keeping shared code in sync").

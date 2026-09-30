@@ -1,13 +1,13 @@
 import { z } from 'npm:zod@4';
 import { getProvider, LlmError, type ChatMessage, type ImageInput } from '../_shared/ai/index.ts';
-import { requireAiEnabled, requireUser, saveProposal } from '../_shared/auth.ts';
+import { enforceRateLimit, requireAiEnabled, requireUser, saveProposal } from '../_shared/auth.ts';
 import { detectBillFlags } from '../_shared/detective.ts';
 import { HttpError, json, readJson, serveJson } from '../_shared/http.ts';
 import { BillParseResultSchema } from '../_shared/schemas.ts';
 
 const BodySchema = z
   .object({
-    imageBase64: z.string().min(100).optional(),
+    imageBase64: z.string().min(100).max(15_000_000).optional(),
     mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']).optional(),
     /** E-bill text (pasted / extracted from an email or PDF). */
     text: z.string().min(10).max(30_000).optional(),
@@ -35,7 +35,8 @@ function stripDataUrl(b64: string): string {
 Deno.serve(
   serveJson(async (req) => {
     const ctx = await requireUser(req);
-    const parsed = BodySchema.safeParse(await readJson(req));
+    await enforceRateLimit(ctx, 'ai-parse-bill', 30);
+    const parsed = BodySchema.safeParse(await readJson(req, 15_000_000));
     if (!parsed.success) throw new HttpError(400, 'invalid_request', parsed.error.issues.map((i) => i.message).join('; '));
     const body = parsed.data;
     const privacy = await requireAiEnabled(ctx);

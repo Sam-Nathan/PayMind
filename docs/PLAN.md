@@ -174,4 +174,5 @@ Reviews run at the end of **every milestone**, not only at the end of the projec
 1. ~~Supabase project~~ Decided: existing project `PayMind` (ref `nlkoxgbrhpkqwuzobjas`, ap-south-1 Mumbai, Postgres 17, empty `public` schema).
 2. An Expo account (for EAS builds) and an Anthropic API key (for Edge Functions).
 3. Speech-to-text vendor for Hindi/Kannada.
-4. Whether Android auto-capture (notification reading) is in the first release, given the Play policy review it triggers.
+4. ~~Auto-capture~~ Decided: **Android auto-capture is in the first release.** Plan for the Play Console sensitive-permission declaration, an in-app prominent disclosure before the system prompt, a privacy policy page on the web app, and a demo video for Play review. The capture pipeline parses on-device first and only sends the minimal parsed fields (amount, payee, time) to the backend.
+5. AI provider: all LLM calls go through one `packages/ai` interface (`parseBill`, `parseExpense`, `assistant`) with swappable adapters (Claude, xAI Grok, Groq). Provider and model are set by env var per Edge Function.
